@@ -283,6 +283,10 @@ void TerminalRenderer::HandleCarriageReturn() {
 }
 
 void TerminalRenderer::HandleBackspace() {
+  // In Windows terminal backspace moves cursor, without removing character
+  MoveCursorRelative(0, -1);
+  return;
+
   std::unique_lock lock(m_mutex);
   Screen& screen = m_useAlternativeScreen ? m_alternativeScreen : m_mainScreen;
 

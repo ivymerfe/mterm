@@ -45,6 +45,21 @@ void Terminal::KeyDown(int key_code) {
     case VK_LEFT:
       seq = "\x1b[D";
       break;
+    case VK_DELETE:
+      seq = "\x1b[3~";
+      break;
+    case VK_HOME:
+      seq = "\x1b[H";  // or "\x1b[1~" depending on terminal
+      break;
+    case VK_END:
+      seq = "\x1b[F";  // or "\x1b[4~" depending on terminal
+      break;
+    case VK_PRIOR:  // Page Up
+      seq = "\x1b[5~";
+      break;
+    case VK_NEXT:  // Page Down
+      seq = "\x1b[6~";
+      break;
     default:
       return;  // ignore other keys here
   }
