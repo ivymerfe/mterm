@@ -53,6 +53,9 @@ class TerminalRenderer {
 
   // Обработка текста
   void InsertText(const std::vector<char32_t>& utf32);
+  std::vector<TextFragment> CreateFragments(const std::vector<char32_t>& utf32,
+                                            int start_pos,
+                                            int end_pos);
   void HandleNewLine();
   void HandleCarriageReturn();
   void HandleBackspace();

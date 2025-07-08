@@ -24,17 +24,17 @@ void TerminalRenderer::SetTerminalSize(int rows, int cols) {
   m_cols = cols;
 
   // Считаем пустые строки с конца
-  int emptyLinesAtEnd = 0;
+  int empty_lines_at_end = 0;
   for (int i = static_cast<int>(m_mainScreen.lines.size()) - 1; i >= 0; --i) {
     if (m_mainScreen.lines[i].glyphs.empty() &&
         m_mainScreen.lines[i].fragments.empty()) {
-      emptyLinesAtEnd++;
+      empty_lines_at_end++;
     } else {
       break;
     }
   }
 
-  while (static_cast<int>(m_mainScreen.lines.size()) - emptyLinesAtEnd > rows) {
+  while (static_cast<int>(m_mainScreen.lines.size()) - empty_lines_at_end > rows) {
     m_scrollback.push_back(std::move(m_mainScreen.lines.front()));
     m_mainScreen.lines.erase(m_mainScreen.lines.begin());
     if (m_scrollback.size() > MAX_SCROLLBACK_LINES) {
@@ -59,7 +59,7 @@ void TerminalRenderer::ProcessAnsi(const char* text, int length) {
   std::vector<char> utf8(text, text + length);
   std::vector<char32_t> input = Utf8ToUtf32(utf8);
 
-  std::vector<char32_t> textBuffer;
+  std::vector<char32_t> text_buffer;
   for (char32_t c : input) {
     if (m_inEscape) {
       if (c < 128) {
@@ -92,51 +92,51 @@ void TerminalRenderer::ProcessAnsi(const char* text, int length) {
         }
       } else {
         ResetEscapeState();
-        textBuffer.push_back(c);
+        text_buffer.push_back(c);
       }
     } else {
       if (c == '\033') {
-        if (!textBuffer.empty()) {
-          InsertText(textBuffer);
-          textBuffer.clear();
+        if (!text_buffer.empty()) {
+          InsertText(text_buffer);
+          text_buffer.clear();
         }
         m_inEscape = true;
         m_escapeState = EscapeState::ESC;
         m_escapeBuffer.clear();
         m_escapeBuffer += static_cast<char>(c);
       } else if (c == '\r') {
-        if (!textBuffer.empty()) {
-          InsertText(textBuffer);
-          textBuffer.clear();
+        if (!text_buffer.empty()) {
+          InsertText(text_buffer);
+          text_buffer.clear();
         }
         HandleCarriageReturn();
       } else if (c == '\n') {
-        if (!textBuffer.empty()) {
-          InsertText(textBuffer);
-          textBuffer.clear();
+        if (!text_buffer.empty()) {
+          InsertText(text_buffer);
+          text_buffer.clear();
         }
         HandleNewLine();
       } else if (c == '\b') {
-        if (!textBuffer.empty()) {
-          InsertText(textBuffer);
-          textBuffer.clear();
+        if (!text_buffer.empty()) {
+          InsertText(text_buffer);
+          text_buffer.clear();
         }
         HandleBackspace();
       } else if (c == '\t') {
-        if (!textBuffer.empty()) {
-          InsertText(textBuffer);
-          textBuffer.clear();
+        if (!text_buffer.empty()) {
+          InsertText(text_buffer);
+          text_buffer.clear();
         }
         HandleTab();
       } else if (c >= 32 || (c >= 1 && c <= 31 && c != 7 && c != 8 && c != 9 &&
                              c != 10 && c != 13)) {
-        textBuffer.push_back(c);
+        text_buffer.push_back(c);
       }
     }
   }
 
-  if (!textBuffer.empty()) {
-    InsertText(textBuffer);
+  if (!text_buffer.empty()) {
+    InsertText(text_buffer);
   }
 }
 
@@ -156,15 +156,15 @@ void TerminalRenderer::InsertText(const std::vector<char32_t>& utf32) {
   }
 
   // Вставляем глифы
-  std::vector<unsigned short> newGlyphs = GetIndices(utf32);
+  std::vector<unsigned short> new_glyphs = GetIndices(utf32);
 
   // Проверяем переполнение строки
-  if (screen.cursorX + static_cast<int>(newGlyphs.size()) >= m_cols) {
+  if (screen.cursorX + static_cast<int>(new_glyphs.size()) >= m_cols) {
     if (m_useAlternativeScreen) {
       // В альтернативном экране обрезаем
       int availableSpace = m_cols - screen.cursorX;
       if (availableSpace > 0) {
-        newGlyphs.resize(availableSpace);
+        new_glyphs.resize(availableSpace);
       } else {
         return;  // Нет места
       }
@@ -173,61 +173,72 @@ void TerminalRenderer::InsertText(const std::vector<char32_t>& utf32) {
   }
 
   // Вставляем глифы
-  for (size_t i = 0; i < newGlyphs.size(); i++) {
+  for (size_t i = 0; i < new_glyphs.size(); i++) {
     if (screen.cursorX + i < line.glyphs.size()) {
-      line.glyphs[screen.cursorX + i] = newGlyphs[i];
+      line.glyphs[screen.cursorX + i] = new_glyphs[i];
     } else {
-      line.glyphs.push_back(newGlyphs[i]);
+      line.glyphs.push_back(new_glyphs[i]);
     }
   }
 
   // Удаляем пересекающиеся фрагменты
   auto& fragments = line.fragments;
-  int startPos = screen.cursorX;
-  int endPos = screen.cursorX + newGlyphs.size() - 1;
+  int start_pos = screen.cursorX;
+  int end_pos = screen.cursorX + new_glyphs.size() - 1;
 
   for (auto it = fragments.begin(); it != fragments.end();) {
-    if (it->start >= startPos && it->start <= endPos) {
+    if (it->start >= start_pos && it->start <= end_pos) {
       it = fragments.erase(it);
-    } else if (it->end >= startPos && it->end <= endPos) {
-      if (it->start < startPos) {
-        it->end = startPos - 1;
+    } else if (it->end >= start_pos && it->end <= end_pos) {
+      if (it->start < start_pos) {
+        it->end = start_pos - 1;
         ++it;
       } else {
         it = fragments.erase(it);
       }
-    } else if (it->start < startPos && it->end > endPos) {
+    } else if (it->start < start_pos && it->end > end_pos) {
       // Фрагмент охватывает всю область вставки - разбиваем его
       TextFragment rightPart = *it;
-      rightPart.start = endPos + 1;
-      it->end = startPos - 1;
+      rightPart.start = end_pos + 1;
+      it->end = start_pos - 1;
       it = fragments.insert(std::next(it), rightPart);
       ++it;
     } else {
       ++it;
     }
   }
-
-  if (utf32.size() > 4) {
-    std::u32string str(utf32.begin(), utf32.end());
-    if (str.starts_with(U"PS ")) {
-      m_foregroundColor = ANSI_BRIGHT_COLORS[2];
-    }
-  }
-
-  // Создаем фрагмент для нового текста
-  if (!newGlyphs.empty()) {
-    TextFragment fragment;
-    fragment.start = startPos;
-    fragment.end = endPos;
-    fragment.color = m_foregroundColor;
-    fragment.background_color = m_backgroundColor;
-    fragment.underline_color = m_underlineEnabled ? m_underlineColor : -1;
-    fragments.push_back(fragment);
+  
+  if (!new_glyphs.empty()) {
+    std::vector<TextFragment> new_fragments =
+        CreateFragments(utf32, start_pos, end_pos);
+    fragments.insert(fragments.end(), new_fragments.begin(), new_fragments.end());
   }
 
   // Двигаем курсор
-  screen.cursorX += newGlyphs.size();
+  screen.cursorX += new_glyphs.size();
+}
+
+std::vector<TextFragment> TerminalRenderer::CreateFragments(
+    const std::vector<char32_t>& utf32,
+    int start_pos,
+    int end_pos) {
+  std::vector<TextFragment> result;
+
+  int fragment_color = m_foregroundColor;
+  if (utf32.size() > 4) {
+    std::u32string str(utf32.begin(), utf32.end());
+    if (str.starts_with(U"PS ")) {
+      fragment_color = ANSI_BRIGHT_COLORS[2];
+    }
+  }
+  TextFragment fragment;
+  fragment.start = start_pos;
+  fragment.end = end_pos;
+  fragment.color = fragment_color;
+  fragment.background_color = m_backgroundColor;
+  fragment.underline_color = m_underlineEnabled ? m_underlineColor : -1;
+  result.push_back(fragment);
+  return result;
 }
 
 void TerminalRenderer::HandleNewLine() {
@@ -312,15 +323,15 @@ void TerminalRenderer::HandleTab() {
   std::unique_lock lock(m_mutex);
   Screen& screen = m_useAlternativeScreen ? m_alternativeScreen : m_mainScreen;
 
-  int newX = ((screen.cursorX / 8) + 1) * 8;
+  int new_x = ((screen.cursorX / 8) + 1) * 8;
   if (m_useAlternativeScreen) {
-    newX = std::min(newX, m_cols - 1);
+    new_x = std::min(new_x, m_cols - 1);
   }
 
   EnsureLineExists(screen.cursorY);
   TextLine& line = screen.lines[screen.cursorY];
 
-  while (screen.cursorX < newX) {
+  while (screen.cursorX < new_x) {
     if (screen.cursorX >= static_cast<int>(line.glyphs.size())) {
       line.glyphs.push_back(m_mterm->GetGlyphIndex(' '));
     }
@@ -411,20 +422,20 @@ void TerminalRenderer::RenderLine(const TextLine& line,
     if (start <= end && start < static_cast<int>(line.glyphs.size())) {
       int fragment_x = fragment.start + x;
       int length = end - start + 1;
-      int actualLength =
+      int actual_length =
           std::min(length, static_cast<int>(line.glyphs.size()) - start);
 
-      if (actualLength > 0) {
+      if (actual_length > 0) {
         if (fragment.background_color != -1) {
           m_mterm->DrawBackground(fragment_x, line_y,
-                                 fragment_x + actualLength - 1, line_y,
+                                 fragment_x + actual_length - 1, line_y,
                                  fragment.background_color);
         }
         if (fragment.underline_color != -1) {
-          m_mterm->DrawUnderline(fragment_x, line_y, actualLength,
+          m_mterm->DrawUnderline(fragment_x, line_y, actual_length,
                                 fragment.underline_color);
         }
-        m_mterm->DrawGlyphs(line.glyphs.data() + start, actualLength, fragment_x,
+        m_mterm->DrawGlyphs(line.glyphs.data() + start, actual_length, fragment_x,
                            line_y, fragment.color);
       }
     }
@@ -443,18 +454,18 @@ void TerminalRenderer::RenderCursor(int x, int y, int num_rows, int num_cols) {
     }
   } else {
     // В основном экране проверяем видимость
-    int totalLines =
+    int total_lines =
         static_cast<int>(m_scrollback.size() + m_mainScreen.lines.size());
-    int startLine = std::max(0, totalLines - num_rows - m_scrollOffset);
-    int cursorGlobalLine =
+    int start_line = std::max(0, total_lines - num_rows - m_scrollOffset);
+    int cursor_global_line =
         static_cast<int>(m_scrollback.size()) + screen.cursorY;
 
-    if (cursorGlobalLine >= startLine &&
-        cursorGlobalLine < startLine + num_rows) {
-      int cursorVisibleLine = cursorGlobalLine - startLine;
+    if (cursor_global_line >= start_line &&
+        cursor_global_line < start_line + num_rows) {
+      int cursor_visible_line = cursor_global_line - start_line;
       if (screen.cursorX >= 0 && screen.cursorX < num_cols &&
-          cursorVisibleLine >= 0 && cursorVisibleLine < num_rows) {
-        m_mterm->DrawCursor(x + screen.cursorX, y + cursorVisibleLine,
+          cursor_visible_line >= 0 && cursor_visible_line < num_rows) {
+        m_mterm->DrawCursor(x + screen.cursorX, y + cursor_visible_line,
                            CURSOR_COLOR);
       }
     }
@@ -472,8 +483,9 @@ bool TerminalRenderer::SetScrollOffset(int offset) {
 }
 
 int TerminalRenderer::GetMaxScrollOffset() const {
-  if (m_useAlternativeScreen)
+  if (m_useAlternativeScreen) {
     return 0;
+  }
   return std::max(
       0, static_cast<int>(m_scrollback.size() + m_mainScreen.lines.size()) -
              m_numVisibleRows);
@@ -501,7 +513,6 @@ void TerminalRenderer::MoveCursor(int row, int col) {
     screen.cursorY = std::min(screen.cursorY, m_rows - 1);
     screen.cursorX = std::min(screen.cursorX, m_cols - 1);
   }
-
   EnsureLineExists(screen.cursorY);
 }
 
@@ -516,7 +527,6 @@ void TerminalRenderer::MoveCursorRelative(int rows, int cols) {
     screen.cursorY = std::min(screen.cursorY, m_rows - 1);
     screen.cursorX = std::min(screen.cursorX, m_cols - 1);
   }
-
   EnsureLineExists(screen.cursorY);
 }
 
@@ -528,18 +538,18 @@ void TerminalRenderer::DeleteCharacters(int count) {
   TextLine& line = screen.lines[screen.cursorY];
 
   if (screen.cursorX < static_cast<int>(line.glyphs.size())) {
-    int deleteEnd =
+    int delete_end =
         std::min(screen.cursorX + count, static_cast<int>(line.glyphs.size()));
-    int deletedCount = deleteEnd - screen.cursorX;
+    int deleted_count = delete_end - screen.cursorX;
 
     line.glyphs.erase(line.glyphs.begin() + screen.cursorX,
-                      line.glyphs.begin() + deleteEnd);
+                      line.glyphs.begin() + delete_end);
 
     // Обновляем фрагменты
     for (auto it = line.fragments.begin(); it != line.fragments.end();) {
-      if (it->start >= deleteEnd) {
-        it->start -= deletedCount;
-        it->end -= deletedCount;
+      if (it->start >= delete_end) {
+        it->start -= deleted_count;
+        it->end -= deleted_count;
         ++it;
       } else if (it->end < screen.cursorX) {
         ++it;
@@ -566,25 +576,25 @@ void TerminalRenderer::EraseCharacters(int count) {
   EnsureLineExists(screen.cursorY);
   TextLine& line = screen.lines[screen.cursorY];
 
-  int eraseEnd =
+  int erase_end =
       std::min(screen.cursorX + count, static_cast<int>(line.glyphs.size()));
 
-  for (int i = screen.cursorX; i < eraseEnd; i++) {
+  for (int i = screen.cursorX; i < erase_end; i++) {
     line.glyphs[i] = m_mterm->GetGlyphIndex(' ');
   }
 
   // Удаляем фрагменты в стираемой области
   for (auto it = line.fragments.begin(); it != line.fragments.end();) {
-    if (it->start >= screen.cursorX && it->end < eraseEnd) {
+    if (it->start >= screen.cursorX && it->end < erase_end) {
       it = line.fragments.erase(it);
-    } else if (it->start >= screen.cursorX && it->start < eraseEnd) {
-      it->start = eraseEnd;
+    } else if (it->start >= screen.cursorX && it->start < erase_end) {
+      it->start = erase_end;
       if (it->start > it->end) {
         it = line.fragments.erase(it);
       } else {
         ++it;
       }
-    } else if (it->end >= screen.cursorX && it->end < eraseEnd) {
+    } else if (it->end >= screen.cursorX && it->end < erase_end) {
       it->end = screen.cursorX - 1;
       if (it->start > it->end) {
         it = line.fragments.erase(it);
@@ -598,21 +608,21 @@ void TerminalRenderer::EraseCharacters(int count) {
 }
 
 void TerminalRenderer::InsertLines(int count) {
-  if (count <= 0)
+  if (count <= 0) {
     return;
+  }
 
   std::unique_lock lock(m_mutex);
   Screen& screen = m_useAlternativeScreen ? m_alternativeScreen : m_mainScreen;
-
   EnsureLineExists(screen.cursorY);
 
   for (int i = 0; i < count; i++) {
     screen.lines.insert(screen.lines.begin() + screen.cursorY, TextLine{});
   }
-
   if (m_useAlternativeScreen &&
       screen.lines.size() > static_cast<size_t>(m_rows)) {
     screen.lines.resize(m_rows);
+
   } else if (!m_useAlternativeScreen) {
     while (static_cast<int>(screen.lines.size()) > m_rows) {
       m_scrollback.push_back(std::move(screen.lines.front()));
@@ -625,19 +635,20 @@ void TerminalRenderer::InsertLines(int count) {
 }
 
 void TerminalRenderer::DeleteLines(int count) {
-  if (count <= 0)
+  if (count <= 0) {
     return;
+  }
 
   std::unique_lock lock(m_mutex);
   Screen& screen = m_useAlternativeScreen ? m_alternativeScreen : m_mainScreen;
 
   EnsureLineExists(screen.cursorY);
 
-  int deleteEnd =
+  int delete_end =
       std::min(screen.cursorY + count, static_cast<int>(screen.lines.size()));
-  if (deleteEnd > screen.cursorY) {
+  if (delete_end > screen.cursorY) {
     screen.lines.erase(screen.lines.begin() + screen.cursorY,
-                       screen.lines.begin() + deleteEnd);
+                       screen.lines.begin() + delete_end);
     EnsureLineExists(screen.cursorY);
   }
 }
@@ -691,15 +702,15 @@ void TerminalRenderer::ClearScreen(int mode) {
         if (!screen.lines.empty()) {
           TextLine& line = screen.lines[0];
           if (screen.cursorX > 0 && !line.glyphs.empty()) {
-            int clearTo = std::min(screen.cursorX + 1,
+            int clear_to = std::min(screen.cursorX + 1,
                                    static_cast<int>(line.glyphs.size()));
             line.glyphs.erase(line.glyphs.begin(),
-                              line.glyphs.begin() + clearTo);
+                              line.glyphs.begin() + clear_to);
 
             // Обновляем фрагменты
             for (auto& fragment : line.fragments) {
-              fragment.start = std::max(0, fragment.start - clearTo);
-              fragment.end = std::max(-1, fragment.end - clearTo);
+              fragment.start = std::max(0, fragment.start - clear_to);
+              fragment.end = std::max(-1, fragment.end - clear_to);
             }
             line.fragments.erase(
                 std::remove_if(line.fragments.begin(), line.fragments.end(),
@@ -752,13 +763,13 @@ void TerminalRenderer::ClearLine(int mode) {
 
     case 1:  // От начала строки до курсора включительно
       if (screen.cursorX >= 0 && !line.glyphs.empty()) {
-        int clearTo =
+        int clear_to =
             std::min(screen.cursorX + 1, static_cast<int>(line.glyphs.size()));
-        line.glyphs.erase(line.glyphs.begin(), line.glyphs.begin() + clearTo);
+        line.glyphs.erase(line.glyphs.begin(), line.glyphs.begin() + clear_to);
 
         for (auto& fragment : line.fragments) {
-          fragment.start = std::max(0, fragment.start - clearTo);
-          fragment.end = std::max(-1, fragment.end - clearTo);
+          fragment.start = std::max(0, fragment.start - clear_to);
+          fragment.end = std::max(-1, fragment.end - clear_to);
         }
         line.fragments.erase(
             std::remove_if(line.fragments.begin(), line.fragments.end(),
@@ -922,22 +933,22 @@ void TerminalRenderer::HandleCSI(const std::vector<int>& params, char command) {
   }
 }
 
-void TerminalRenderer::HandleCSISequence(const std::string& csiPart) {
-  if (csiPart.empty())
+void TerminalRenderer::HandleCSISequence(const std::string& csi_part) {
+  if (csi_part.empty())
     return;
 
-  char command = csiPart.back();
-  std::string paramString = csiPart.substr(0, csiPart.length() - 1);
+  char command = csi_part.back();
+  std::string param_string = csi_part.substr(0, csi_part.length() - 1);
 
-  bool isPrivateMode = false;
-  if (!paramString.empty() && paramString[0] == '?') {
-    isPrivateMode = true;
-    paramString = paramString.substr(1);
+  bool is_private_mode = false;
+  if (!param_string.empty() && param_string[0] == '?') {
+    is_private_mode = true;
+    param_string = param_string.substr(1);
   }
 
   std::vector<int> params;
-  if (!paramString.empty()) {
-    std::stringstream ss(paramString);
+  if (!param_string.empty()) {
+    std::stringstream ss(param_string);
     std::string param;
     while (std::getline(ss, param, ';')) {
       if (!param.empty()) {
@@ -956,7 +967,7 @@ void TerminalRenderer::HandleCSISequence(const std::string& csiPart) {
     params.push_back(0);
   }
 
-  if (isPrivateMode) {
+  if (is_private_mode) {
     HandlePrivateMode(params, command);
   } else {
     HandleCSI(params, command);
