@@ -1,20 +1,20 @@
 ﻿#pragma once
 
-constexpr auto WINDOW_WIDTH = 900;
-constexpr auto WINDOW_HEIGHT = 600;
+constexpr auto WINDOW_WIDTH = 950;
+constexpr auto WINDOW_HEIGHT = 500;
 constexpr auto WINDOW_MIN_WIDTH = 225;
 constexpr auto WINDOW_MIN_HEIGHT = 150;
 
-constexpr auto CAPTION_SIZE = 18;
+constexpr auto CAPTION_SIZE = 25;
 constexpr auto BORDER_SIZE = 5;
 
-constexpr auto SYS_BUTTON_SIZE = 25;
-constexpr auto CLOSE_BUTTON_OFFSET = 5 + SYS_BUTTON_SIZE;
-constexpr auto MAX_BUTTON_OFFSET = 40 + SYS_BUTTON_SIZE;
-constexpr auto MIN_BUTTON_OFFSET = 75 + SYS_BUTTON_SIZE;
+constexpr auto BUTTON_SIZE = 20;
+constexpr auto BUTTON_MARGIN = 13;
+constexpr auto CLOSE_BUTTON_OFFSET = BUTTON_SIZE;
+constexpr auto MIN_BUTTON_OFFSET = 45 + BUTTON_SIZE;
 
 constexpr wchar_t FONT_NAME[] = L"Cascadia Mono";
-constexpr int DEFAULT_FONT_SIZE = 11;
+constexpr int DEFAULT_FONT_SIZE = 13;
 
 constexpr auto WINDOW_BG_COLOR = 0x191919;
 constexpr auto CLOSE_BUTTON_COLOR = 0xff0000;

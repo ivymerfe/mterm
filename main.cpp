@@ -45,7 +45,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
   g_hWindow = CreateWindowEx(NULL,
                              CLASS_NAME,
                              NULL,           // Window text
-                             WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX |
+                             WS_POPUP | WS_MINIMIZEBOX |
                                  WS_MAXIMIZEBOX,  // Window style
                              pos_x, pos_y, WINDOW_WIDTH, WINDOW_HEIGHT,
                              NULL,       // Parent window
@@ -78,39 +78,39 @@ static int HitTest(HWND hWnd, WPARAM wparam, LPARAM lParam) {
   GetWindowRect(hWnd, &rect);
   int x = GET_X_LPARAM(lParam);
   int y = GET_Y_LPARAM(lParam);
-  int left = x < rect.left + BORDER_SIZE;
-  int right = x > rect.right - BORDER_SIZE;
-  int top = y < rect.top + BORDER_SIZE;
-  int bottom = y > rect.bottom - BORDER_SIZE;
 
-  if (top & left)
-    return HTTOPLEFT;
-  if (top & right)
-    return HTTOPRIGHT;
-  if (top)
-    return HTTOP;
-  if (bottom & left)
-    return HTBOTTOMLEFT;
-  if (bottom & right)
-    return HTBOTTOMRIGHT;
-  if (bottom)
-    return HTBOTTOM;
-  if (left)
-    return HTLEFT;
-  if (right)
-    return HTRIGHT;
+  if (!IsZoomed(hWnd))
+  {
+    int left = x < rect.left + BORDER_SIZE;
+    int right = x > rect.right - BORDER_SIZE;
+    int top = y < rect.top + BORDER_SIZE;
+    int bottom = y > rect.bottom - BORDER_SIZE;
+
+    if (top & left)
+      return HTTOPLEFT;
+    if (top & right)
+      return HTTOPRIGHT;
+    if (top)
+      return HTTOP;
+    if (bottom & left)
+      return HTBOTTOMLEFT;
+    if (bottom & right)
+      return HTBOTTOMRIGHT;
+    if (bottom)
+      return HTBOTTOM;
+    if (left)
+      return HTLEFT;
+    if (right)
+      return HTRIGHT;
+  }
 
   if (y < rect.top + CAPTION_SIZE) {
-    float close_button_left = rect.right - CLOSE_BUTTON_OFFSET;
-    if (x >= close_button_left && x <= close_button_left + SYS_BUTTON_SIZE) {
+    float close_button_mid = rect.right - CLOSE_BUTTON_OFFSET;
+    if (x >= close_button_mid - BUTTON_SIZE && x <= close_button_mid + BUTTON_SIZE) {
       return HTCLOSE;
     }
-    float max_button_left = rect.right - MAX_BUTTON_OFFSET;
-    if (x >= max_button_left && x <= max_button_left + SYS_BUTTON_SIZE) {
-      return HTMAXBUTTON;
-    }
-    float min_button_left = rect.right - MIN_BUTTON_OFFSET;
-    if (x >= min_button_left && x <= min_button_left + SYS_BUTTON_SIZE) {
+    float min_button_mid = rect.right - MIN_BUTTON_OFFSET;
+    if (x >= min_button_mid - BUTTON_SIZE && x <= min_button_mid + BUTTON_SIZE) {
       return HTMINBUTTON;
     }
     return HTCAPTION;
@@ -139,6 +139,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
   static wchar_t pending_high_surrogate = 0;
 
   switch (uMsg) {
+    case WM_CREATE: {
+      // If we add thickframe in CreateWindow, then there will be a white
+      // caption for a moment.
+      LONG style = GetWindowLong(hWnd, GWL_STYLE);
+      style |= WS_THICKFRAME;
+      SetWindowLong(hWnd, GWL_STYLE, style);
+      return 0;
+    }
     case WM_CLOSE:
     case WM_DESTROY:
       PostQuitMessage(0);
@@ -183,6 +191,24 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
 
       pMinMax->ptMinTrackSize.x = WINDOW_MIN_WIDTH;
       pMinMax->ptMinTrackSize.y = WINDOW_MIN_HEIGHT;
+      // Get the monitor that the window is on
+      HMONITOR hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+      if (hMonitor) {
+        MONITORINFO mi = {sizeof(mi)};
+        if (GetMonitorInfo(hMonitor, &mi)) {
+          // Work area excludes taskbar
+          RECT& rcWork = mi.rcWork;
+          RECT& rcMonitor = mi.rcMonitor;
+
+          // Set max size to work area size
+          pMinMax->ptMaxSize.x = rcWork.right - rcWork.left;
+          pMinMax->ptMaxSize.y = rcWork.bottom - rcWork.top;
+
+          // Set max position to work area top-left
+          pMinMax->ptMaxPosition.x = rcWork.left - rcMonitor.left;
+          pMinMax->ptMaxPosition.y = rcWork.top - rcMonitor.top;
+        }
+      }
       return 0;
     }
     case WM_SIZE: {
@@ -262,10 +288,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
                        SWP_NOMOVE | SWP_NOZORDER);
         }
       }
+      if (wParam == 'D') {
+        ShowWindow(hWnd, SW_MINIMIZE);
+      }
       break;
     }
     case WM_SYSKEYUP: {
-      if (wParam == 'D') {
+      if (wParam == 'F') {
         isTopmost = !isTopmost;
         if (isTopmost) {
           SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,

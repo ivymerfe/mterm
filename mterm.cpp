@@ -90,31 +90,20 @@ void Mterm::Render() {
 
   float width = m_windowSize.width;
   float height = m_windowSize.height;
-  float margin = 7;
-  float min_button_y = floor((CAPTION_SIZE + margin) / 2);
+  float size = BUTTON_SIZE - BUTTON_MARGIN;
+  float y = CAPTION_SIZE - size;
+  float min_x = width - MIN_BUTTON_OFFSET;
+  float close_x = width - CLOSE_BUTTON_OFFSET;
 
-  D2D1_RECT_F min_btn_rect = {
-      width - MIN_BUTTON_OFFSET + margin, min_button_y,
-      width - MIN_BUTTON_OFFSET + SYS_BUTTON_SIZE - margin, min_button_y + 1};
+  D2D1_RECT_F min_btn_rect = {min_x - size, y, min_x + size, y + 1};
 
   m_renderTarget->FillRectangle(min_btn_rect, m_minBrush.Get());
 
-  D2D1_RECT_F max_btn_rect = {
-      width - MAX_BUTTON_OFFSET + margin, margin,
-      width - MAX_BUTTON_OFFSET + SYS_BUTTON_SIZE - margin - 1.5,
-      CAPTION_SIZE - 1.5};
+  m_renderTarget->DrawLine({close_x - size, y - size},
+                           {close_x + size, y + size}, m_closeBrush.Get(), 1.5);
 
-  m_renderTarget->DrawRectangle(max_btn_rect, m_maxBrush.Get(), 1.5);
-
-  m_renderTarget->DrawLine(
-      {width - CLOSE_BUTTON_OFFSET + margin, margin},
-      {width - CLOSE_BUTTON_OFFSET + SYS_BUTTON_SIZE - margin, CAPTION_SIZE},
-      m_closeBrush.Get(), 1.5);
-
-  m_renderTarget->DrawLine(
-      {width - CLOSE_BUTTON_OFFSET + margin, CAPTION_SIZE},
-      {width - CLOSE_BUTTON_OFFSET + SYS_BUTTON_SIZE - margin, margin},
-      m_closeBrush.Get(), 1.5);
+  m_renderTarget->DrawLine({close_x - size, y + size},
+                           {close_x + size, y - size}, m_closeBrush.Get(), 1.5);
 
   ThrowIfFailed(m_renderTarget->EndDraw());
 }
@@ -131,9 +120,14 @@ UINT16 Mterm::GetGlyphIndex(char32_t codepoint) {
 }
 
 // Warning - indices should be valid when EndDraw is called
-void Mterm::DrawGlyphs(const UINT16* indices, int count, int x, int y, int color) {
+void Mterm::DrawGlyphs(const UINT16* indices,
+                       int count,
+                       int x,
+                       int y,
+                       int color) {
   float pos_x = round(x * GetAdvance());
-  float baseline_y = round(y * GetLineHeight() + GetBaselineOffset() + CAPTION_SIZE);
+  float baseline_y =
+      round(y * GetLineHeight() + GetBaselineOffset() + CAPTION_SIZE);
 
   DWRITE_GLYPH_RUN glyphRun = {};
   glyphRun.fontFace = m_fontFace.Get();
@@ -177,10 +171,10 @@ void Mterm::DrawCursor(int x, int y, int color) {
 }
 
 void Mterm::DrawBackground(int start_x,
-                          int start_y,
-                          int end_x,
-                          int end_y,
-                          int color) {
+                           int start_y,
+                           int end_x,
+                           int end_y,
+                           int color) {
   D2D1_RECT_F rect = {round(start_x * GetAdvance()),
                       round(start_y * GetLineHeight() + CAPTION_SIZE),
                       round((end_x + 1) * GetAdvance()),
