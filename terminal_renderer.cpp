@@ -1,4 +1,4 @@
-﻿#include "terminal_renderer.h"
+#include "terminal_renderer.h"
 
 #include <algorithm>
 #include <charconv>
@@ -9,6 +9,8 @@
 
 #undef min
 #undef max
+
+namespace Mterm {
 
 TerminalRenderer::TerminalRenderer(Mterm* mterm) : m_mterm(mterm) {
   SetTerminalSize(mterm->GetNumRows(), mterm->GetNumColumns());
@@ -34,7 +36,8 @@ void TerminalRenderer::SetTerminalSize(int rows, int cols) {
     }
   }
 
-  while (static_cast<int>(m_mainScreen.lines.size()) - empty_lines_at_end > rows) {
+  while (static_cast<int>(m_mainScreen.lines.size()) - empty_lines_at_end >
+         rows) {
     m_scrollback.push_back(std::move(m_mainScreen.lines.front()));
     m_mainScreen.lines.erase(m_mainScreen.lines.begin());
     if (m_scrollback.size() > MAX_SCROLLBACK_LINES) {
@@ -57,7 +60,7 @@ void TerminalRenderer::SetTerminalSize(int rows, int cols) {
 
 void TerminalRenderer::ProcessAnsi(const char* text, int length) {
   std::vector<char> utf8(text, text + length);
-  std::vector<char32_t> input = Utf8ToUtf32(utf8);
+  std::vector<char32_t> input = Utils::Utf8ToUtf32(utf8);
 
   std::vector<char32_t> text_buffer;
   for (char32_t c : input) {
@@ -207,11 +210,12 @@ void TerminalRenderer::InsertText(const std::vector<char32_t>& utf32) {
       ++it;
     }
   }
-  
+
   if (!new_glyphs.empty()) {
     std::vector<TextFragment> new_fragments =
         CreateFragments(utf32, start_pos, end_pos);
-    fragments.insert(fragments.end(), new_fragments.begin(), new_fragments.end());
+    fragments.insert(fragments.end(), new_fragments.begin(),
+                     new_fragments.end());
   }
 
   // Двигаем курсор
@@ -382,7 +386,7 @@ void TerminalRenderer::Render(int x, int y, int num_rows, int num_cols) {
     int main_start =
         std::max(0, start_line - static_cast<int>(m_scrollback.size()));
     for (int i = main_start; i < static_cast<int>(m_mainScreen.lines.size()) &&
-                            rendered_lines < num_rows;
+                             rendered_lines < num_rows;
          i++) {
       RenderLine(m_mainScreen.lines[i], y + rendered_lines, x, num_cols);
       rendered_lines++;
@@ -410,7 +414,7 @@ void TerminalRenderer::RenderLineNumbers(int x, int y, int num_rows) {
         m_lineNumberGlyphs[offset + j] = m_mterm->GetGlyphIndex(buffer[j]);
       }
       m_mterm->DrawGlyphs(m_lineNumberGlyphs.data() + offset, length, 0, line_y,
-                         LINE_NUMBER_COLOR);
+                          LINE_NUMBER_COLOR);
     }
     line_y++;
   }
@@ -432,15 +436,15 @@ void TerminalRenderer::RenderLine(const TextLine& line,
       if (actual_length > 0) {
         if (fragment.background_color != -1) {
           m_mterm->DrawBackground(fragment_x, line_y,
-                                 fragment_x + actual_length - 1, line_y,
-                                 fragment.background_color);
+                                  fragment_x + actual_length - 1, line_y,
+                                  fragment.background_color);
         }
         if (fragment.underline_color != -1) {
           m_mterm->DrawUnderline(fragment_x, line_y, actual_length,
-                                fragment.underline_color);
+                                 fragment.underline_color);
         }
-        m_mterm->DrawGlyphs(line.glyphs.data() + start, actual_length, fragment_x,
-                           line_y, fragment.color);
+        m_mterm->DrawGlyphs(line.glyphs.data() + start, actual_length,
+                            fragment_x, line_y, fragment.color);
       }
     }
   }
@@ -470,7 +474,7 @@ void TerminalRenderer::RenderCursor(int x, int y, int num_rows, int num_cols) {
       if (screen.cursorX >= 0 && screen.cursorX < num_cols &&
           cursor_visible_line >= 0 && cursor_visible_line < num_rows) {
         m_mterm->DrawCursor(x + screen.cursorX, y + cursor_visible_line,
-                           CURSOR_COLOR);
+                            CURSOR_COLOR);
       }
     }
   }
@@ -707,7 +711,7 @@ void TerminalRenderer::ClearScreen(int mode) {
           TextLine& line = screen.lines[0];
           if (screen.cursorX > 0 && !line.glyphs.empty()) {
             int clear_to = std::min(screen.cursorX + 1,
-                                   static_cast<int>(line.glyphs.size()));
+                                    static_cast<int>(line.glyphs.size()));
             line.glyphs.erase(line.glyphs.begin(),
                               line.glyphs.begin() + clear_to);
 
@@ -1099,3 +1103,5 @@ std::vector<unsigned short> TerminalRenderer::GetIndices(
   }
   return indices;
 }
+
+}  // namespace Mterm

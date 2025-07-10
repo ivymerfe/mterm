@@ -1,4 +1,4 @@
-﻿#define WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
 #include "Windows.h"
 
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
@@ -8,11 +8,12 @@
 
 #include "mterm.h"
 #include "resource.h"
+#include "defaults.h"
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 HWND g_hWindow;
-Mterm g_Mterm;
+Mterm::Mterm g_Mterm;
 
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
@@ -34,12 +35,23 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
   RegisterClassEx(&windowClass);
 
+  int width = WINDOW_WIDTH;
+  int height = WINDOW_HEIGHT;
+
   int pos_x = CW_USEDEFAULT;
   int pos_y = CW_USEDEFAULT;
   POINT pt;
   if (GetCursorPos(&pt)) {
-    pos_x = pt.x - WINDOW_WIDTH / 4;
-    pos_y = pt.y - WINDOW_HEIGHT / 6;
+    HMONITOR hMonitor = MonitorFromPoint(pt, NULL);
+    if (hMonitor) {
+      MONITORINFO mi = {sizeof(mi)};
+      if (GetMonitorInfo(hMonitor, &mi)) {
+        // Work area excludes taskbar
+        RECT& rcWork = mi.rcWork;
+        pos_x = rcWork.left + (rcWork.right - rcWork.left - width) / 2;
+        pos_y = rcWork.top + (rcWork.bottom - rcWork.top - height) / 2;
+      }
+    }
   }
 
   g_hWindow = CreateWindowEx(NULL,
@@ -47,7 +59,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
                              NULL,           // Window text
                              WS_POPUP | WS_MINIMIZEBOX |
                                  WS_MAXIMIZEBOX,  // Window style
-                             pos_x, pos_y, WINDOW_WIDTH, WINDOW_HEIGHT,
+                             pos_x, pos_y, width, height,
                              NULL,       // Parent window
                              NULL,       // Menu
                              hInstance,  // Instance handle
@@ -56,7 +68,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
   if (g_hWindow == NULL) {
     return 0;
   }
-  ShowWindow(g_hWindow, SW_SHOWDEFAULT);
+  ShowWindow(g_hWindow, nCmdShow);
   UpdateWindow(g_hWindow);
 
   std::thread init_thread([]() {
@@ -118,24 +130,10 @@ static int HitTest(HWND hWnd, WPARAM wparam, LPARAM lParam) {
   return HTCLIENT;
 }
 
-static void MaybeResize(HWND hWindow) {
-  if (g_Mterm.IsInitialized()) {
-    RECT window_rect;
-    GetWindowRect(hWindow, &window_rect);
-    UINT width = window_rect.right - window_rect.left;
-    UINT height = window_rect.bottom - window_rect.top;
-    if (width > 0 && height > 0) {
-      g_Mterm.Resize(width, height);
-    }
-  }
-}
-
 LRESULT CALLBACK WindowProc(HWND hWnd,
                             UINT uMsg,
                             WPARAM wParam,
                             LPARAM lParam) {
-  static bool isResizing = false;
-  static bool isTopmost = false;
   static wchar_t pending_high_surrogate = 0;
 
   switch (uMsg) {
@@ -160,10 +158,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
     case WM_NCHITTEST:
       return HitTest(hWnd, wParam, lParam);
     case WM_NCPAINT:
-    case WM_NCACTIVATE:
     case WM_SETTEXT:
     case WM_SETICON:
       return 0;  // Block all default non-client painting
+    case WM_NCACTIVATE: {
+      // Tell Windows to not redraw the non-client area (title bar)
+      return DefWindowProc(hWnd, uMsg, FALSE, -1);
+    }
     case WM_NCLBUTTONDOWN: {
       if (wParam == HTCLOSE || wParam == HTMAXBUTTON || wParam == HTMINBUTTON) {
         return 0;
@@ -212,27 +213,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
       return 0;
     }
     case WM_SIZE: {
-      //if (!isResizing &&
-      //    (wParam == SIZE_MAXIMIZED || wParam == SIZE_RESTORED)) {
-      //  MaybeResize(hWnd);
-      //}
-      MaybeResize(hWnd);
-      return 0;
-    }
-    case WM_ENTERSIZEMOVE: {
-      isResizing = true;
-      return 0;
-    }
-    case WM_EXITSIZEMOVE: {
-      isResizing = false;
-      MaybeResize(hWnd);
-      return 0;
-    }
-    case WM_ACTIVATE: {
       if (g_Mterm.IsInitialized()) {
-        g_Mterm.Redraw();
+        UINT width = LOWORD(lParam);
+        UINT height = HIWORD(lParam);
+        if (width > WINDOW_MIN_WIDTH && height > WINDOW_MIN_HEIGHT) {
+          g_Mterm.Resize(width, height);
+        }
       }
-      break;
+      return 0;
     }
     case WM_PAINT: {
       PAINTSTRUCT ps;
@@ -288,23 +276,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
                        SWP_NOMOVE | SWP_NOZORDER);
         }
       }
-      if (wParam == 'D') {
-        ShowWindow(hWnd, SW_MINIMIZE);
-      }
       break;
-    }
-    case WM_SYSKEYUP: {
-      if (wParam == 'F') {
-        isTopmost = !isTopmost;
-        if (isTopmost) {
-          SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
-                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        } else {
-          SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        }
-      }
-      return 0;
     }
     case WM_KEYDOWN: {
       g_Mterm.KeyDown(wParam);

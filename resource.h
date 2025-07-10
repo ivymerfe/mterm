@@ -1,7 +1,4 @@
 //{{NO_DEPENDENCIES}}
-// Включаемый файл, созданный в Microsoft Visual C++.
-// Используется resource.rc
-//
 #define IDI_APP_ICON                    102
 
 // Next default values for new objects
@@ -14,3 +11,4 @@
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
+

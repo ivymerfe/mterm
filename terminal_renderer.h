@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <deque>
 #include <shared_mutex>
@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "defaults.h"
+
+namespace Mterm {
 
 class Mterm;
 
@@ -131,3 +133,5 @@ class TerminalRenderer {
   static constexpr int MAX_SCROLLBACK_LINES = 1000000;
   static constexpr int MAX_LINE_NUMBER_SIZE = 16;
 };
+
+}  // namespace Mterm

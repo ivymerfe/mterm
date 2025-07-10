@@ -1,4 +1,4 @@
-﻿#include "terminal.h"
+#include "terminal.h"
 
 #include "Windows.h"
 
@@ -7,6 +7,8 @@
 
 #include <charconv>
 #include <functional>
+
+namespace Mterm {
 
 Terminal::Terminal(Mterm* mterm)
     : m_contentRenderer(mterm),
@@ -78,7 +80,7 @@ void Terminal::Input(char32_t key) {
 
   char buf[4];
   int length = 0;
-  Utf32CharToUtf8(key, buf, length);
+  Utils::Utf32CharToUtf8(key, buf, length);
   m_pty.Send(buf, length);
 }
 
@@ -87,18 +89,19 @@ void Terminal::MouseMove(int x, int y) {}
 void Terminal::MouseDown(int x, int y, int button) {}
 
 void Terminal::MouseUp(int x, int y, int button) {
-  if (button == 1)
-  {
+  if (button == 1) {
     if (OpenClipboard(nullptr)) {
       HANDLE hData = GetClipboardData(CF_UNICODETEXT);
       if (hData) {
         LPCWSTR pszText = static_cast<LPCWSTR>(GlobalLock(hData));
         if (pszText) {
           int len = lstrlenW(pszText);
-          int utf8Len = WideCharToMultiByte(CP_UTF8, 0, pszText, len, nullptr, 0, nullptr, nullptr);
+          int utf8Len = WideCharToMultiByte(CP_UTF8, 0, pszText, len, nullptr,
+                                            0, nullptr, nullptr);
           if (utf8Len > 0) {
             std::string utf8Text(utf8Len, 0);
-            WideCharToMultiByte(CP_UTF8, 0, pszText, len, utf8Text.data(), utf8Len, nullptr, nullptr);
+            WideCharToMultiByte(CP_UTF8, 0, pszText, len, utf8Text.data(),
+                                utf8Len, nullptr, nullptr);
             m_pty.Send(utf8Text.data(), utf8Len);
           }
           GlobalUnlock(hData);
@@ -112,11 +115,12 @@ void Terminal::MouseUp(int x, int y, int button) {
 void Terminal::Scroll(int x, int y, int delta) {
   delta *= floor(0.07 * m_mterm->GetNumRows());
   int current_offset = m_contentRenderer.GetScrollOffset();
-  if (m_contentRenderer.SetScrollOffset(current_offset + delta))
-  {
+  if (m_contentRenderer.SetScrollOffset(current_offset + delta)) {
     if (delta < 0) {
       m_shouldTrack.store(false);
     }
     m_mterm->Redraw();
   }
 }
+
+}  // namespace Mterm

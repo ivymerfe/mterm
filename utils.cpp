@@ -1,38 +1,10 @@
-﻿#include "utils.h"
+#include "utils.h"
 
 #include <stdexcept>
 
-bool ReadFileContent(LPCWSTR file_path, std::vector<char>& buffer) {
-  HANDLE file = CreateFile(file_path, GENERIC_READ, 0, NULL, OPEN_EXISTING,
-                           FILE_ATTRIBUTE_NORMAL, 0);
-  if (file == INVALID_HANDLE_VALUE) {
-    return false;
-  }
+namespace Mterm {
 
-  LARGE_INTEGER fileSize;
-  if (!GetFileSizeEx(file, &fileSize)) {
-    CloseHandle(file);
-    return false;
-  }
-
-  if (fileSize.QuadPart > MAXDWORD) {
-    CloseHandle(file);
-    return false;
-  }
-  buffer.resize(fileSize.QuadPart);
-
-  DWORD bytesRead;
-  if (!ReadFile(file, buffer.data(), static_cast<DWORD>(fileSize.QuadPart),
-                &bytesRead, NULL) ||
-      bytesRead != fileSize.QuadPart) {
-    CloseHandle(file);
-    return false;
-  }
-  CloseHandle(file);
-  return true;
-}
-
-std::vector<char32_t> Utf8ToUtf32(const std::vector<char>& utf8) {
+std::vector<char32_t> Utils::Utf8ToUtf32(const std::vector<char>& utf8) {
   std::vector<char32_t> utf32;
   size_t i = 0;
 
@@ -74,7 +46,7 @@ std::vector<char32_t> Utf8ToUtf32(const std::vector<char>& utf8) {
   return utf32;
 }
 
-std::vector<char> Utf32ToUtf8(const std::vector<char32_t>& utf32) {
+std::vector<char> Utils::Utf32ToUtf8(const std::vector<char32_t>& utf32) {
   std::vector<char> utf8;
   for (char32_t codepoint : utf32) {
     if (codepoint <= 0x7F) {
@@ -102,7 +74,7 @@ std::vector<char> Utf32ToUtf8(const std::vector<char32_t>& utf32) {
   return utf8;
 }
 
-void Utf32CharToUtf8(char32_t codepoint, char out[4], int& out_len) {
+void Utils::Utf32CharToUtf8(char32_t codepoint, char out[4], int& out_len) {
   if (codepoint <= 0x7F) {
     out[0] = static_cast<char>(codepoint);
     out_len = 1;
@@ -125,7 +97,8 @@ void Utf32CharToUtf8(char32_t codepoint, char out[4], int& out_len) {
     out_len = 0;
   }
 }
-std::vector<std::vector<char32_t>> SplitByLines(
+
+std::vector<std::vector<char32_t>> Utils::SplitByLines(
     const std::vector<char32_t>& input) {
   std::vector<std::vector<char32_t>> lines;
   std::vector<char32_t> current_line;
@@ -159,3 +132,5 @@ std::vector<std::vector<char32_t>> SplitByLines(
 
   return lines;
 }
+
+}  // namespace Mterm

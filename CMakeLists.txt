@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.12)
+cmake_minimum_required (VERSION 3.12)
 
 # Включение горячей перезагрузки для компиляторов MSVC, если поддерживается.
 if (POLICY CMP0141)
@@ -10,7 +10,7 @@ project ("mterm")
 
 add_compile_definitions(UNICODE _UNICODE)
 
-add_executable (mterm WIN32 "main.cpp" "resource.rc" "defaults.h" "mterm.cpp" "mterm.h" "terminal.h" "terminal.cpp" "utils.h" "utils.cpp" "terminal_renderer.h" "terminal_renderer.cpp" "pty.h" "pty.cpp")
+add_executable (mterm WIN32 "main.cpp" "resource.rc" "defaults.h" "mterm.cpp" "mterm.h" "utils.h" "utils.cpp" "pty.h" "pty.cpp" "renderer.h" "renderer.cpp")
 target_link_libraries (mterm dxguid.lib d2d1.lib dwrite.lib)
 
 set_property(TARGET mterm PROPERTY CXX_STANDARD 20)

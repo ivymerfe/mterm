@@ -1,16 +1,19 @@
-﻿#pragma once
-
-#include "Windows.h"
+#pragma once
 
 #include <vector>
 
-bool ReadFileContent(LPCWSTR file_path, std::vector<char>& buffer);
+namespace Mterm {
 
-std::vector<char32_t> Utf8ToUtf32(const std::vector<char>& utf8);
+static class Utils {
+ public:
+  static std::vector<char32_t> Utf8ToUtf32(const std::vector<char>& utf8);
 
-std::vector<char> Utf32ToUtf8(const std::vector<char32_t>& utf32);
+  static std::vector<char> Utf32ToUtf8(const std::vector<char32_t>& utf32);
 
-void Utf32CharToUtf8(char32_t codepoint, char out[4], int& out_len);
+  static void Utf32CharToUtf8(char32_t codepoint, char out[4], int& out_len);
 
-std::vector<std::vector<char32_t>> SplitByLines(
-    const std::vector<char32_t>& input);
+  static std::vector<std::vector<char32_t>> SplitByLines(
+      const std::vector<char32_t>& input);
+};
+
+}  // namespace Mterm

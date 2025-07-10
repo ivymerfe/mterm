@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <string>
 #include <vector>
@@ -7,6 +7,8 @@
 #include "defaults.h"
 #include "terminal_renderer.h"
 #include "pty.h"
+
+namespace Mterm {
 
 class Mterm;
 
@@ -37,3 +39,5 @@ class Terminal {
 
   void OnOutput(const char* data, DWORD len);
 };
+
+}  // namespace Mterm
