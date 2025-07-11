@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-namespace Mterm {
+namespace MTerm {
 
 class Renderer {
  public:
@@ -67,4 +67,4 @@ class Renderer {
   std::unique_ptr<Impl> m_impl;
 };
 
-}  // namespace Mterm
+}  // namespace MTerm

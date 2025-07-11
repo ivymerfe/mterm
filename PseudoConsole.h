@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-namespace Mterm {
+namespace MTerm {
 
 class PseudoConsole {
  public:
@@ -22,4 +22,4 @@ class PseudoConsole {
   std::unique_ptr<Impl> m_impl;
 };
 
-}  // namespace Mterm
+}  // namespace MTerm

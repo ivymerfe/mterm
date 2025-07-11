@@ -1,8 +1,8 @@
-#include "utils.h"
+#include "Utils.h"
 
 #include <stdexcept>
 
-namespace Mterm {
+namespace MTerm {
 
 std::vector<char32_t> Utils::Utf8ToUtf32(const std::vector<char>& utf8) {
   std::vector<char32_t> utf32;
@@ -133,4 +133,4 @@ std::vector<std::vector<char32_t>> Utils::SplitByLines(
   return lines;
 }
 
-}  // namespace Mterm
+}  // namespace MTerm

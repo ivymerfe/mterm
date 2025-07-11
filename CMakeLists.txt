@@ -10,7 +10,7 @@ project ("mterm")
 
 add_compile_definitions(UNICODE _UNICODE)
 
-add_executable (mterm WIN32 "main.cpp" "resource.rc" "defaults.h" "mterm.cpp" "mterm.h" "utils.h" "utils.cpp" "pty.h" "pty.cpp" "renderer.h" "renderer.cpp")
+add_executable (mterm WIN32 "main.cpp" "resource.rc" "defaults.h" "MTerm.cpp" "MTerm.h" "Utils.h" "Utils.cpp" "PseudoConsole.h" "PseudoConsole.cpp" "Renderer.h" "Renderer.cpp" "ColoredTextBuffer.h" "ColoredTextBuffer.cpp")
 target_link_libraries (mterm dxguid.lib d2d1.lib dwrite.lib)
 
 set_property(TARGET mterm PROPERTY CXX_STANDARD 20)

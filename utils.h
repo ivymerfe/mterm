@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace Mterm {
+namespace MTerm {
 
 static class Utils {
  public:
@@ -16,4 +16,4 @@ static class Utils {
       const std::vector<char32_t>& input);
 };
 
-}  // namespace Mterm
+}  // namespace MTerm

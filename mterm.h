@@ -2,13 +2,14 @@
 
 #include <vector>
 
-#include "renderer.h"
+#include "ColoredTextBuffer.h"
+#include "Renderer.h"
 
-namespace Mterm {
+namespace MTerm {
 
-class Mterm {
+class MTerm {
  public:
-  Mterm();
+  MTerm();
 
   void Init(void* window);
   void Destroy();
@@ -36,6 +37,7 @@ class Mterm {
   unsigned int m_height;
 
   Renderer m_renderer;
+  ColoredTextBuffer m_buffer;
 };
 
-}  // namespace Mterm
+}  // namespace MTerm

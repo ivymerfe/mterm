@@ -1,14 +1,35 @@
-#include "mterm.h"
+#include "MTerm.h"
 
 #include <algorithm>
 
 #include "defaults.h"
 
-namespace Mterm {
+namespace MTerm {
 
-Mterm::Mterm() {}
+MTerm::MTerm() {}
 
-void Mterm::Init(void* window) {
+void MTerm::Init(void* window) {
+  const char32_t text[] = U"I love you, wrld";
+  m_buffer.AddLine();
+  m_buffer.SetText(0, 0, text, _countof(text) - 1);
+  m_buffer.SetColor(0, 0, 4, 0xff0000, 0x00ff00, 0x0000ff);
+  m_buffer.SetColor(0, 5, 9, 0xffff00, 0xff0000, 0xff0000);
+  m_buffer.SetColor(0, 10, 15, 0xffffff, 0x000000, 0xff0000);
+  m_buffer.SetColor(0, 10, 15, 0xffffff, 0x000000, 0xff0000);
+  m_buffer.SetColor(0, 12, 13, 0xff00ff, 0x000000, 0xff0000);
+  m_buffer.SetColor(0, 11, 15, 0xffffff, 0x000000, 0xff0000);
+  m_buffer.SetColor(0, 12, 15, 0xffffff, 0x000000, 0xff0000);
+  m_buffer.SetColor(0, 12, 13, 0x0f0fff, 0x00f000, 0xff00f0);
+
+  m_buffer.SetColor(0, 1, 2, 0xffff00, 0x00ff00, 0x000000);
+
+  const char32_t text2[] = U"I hate you, wrld";
+  m_buffer.AddLine();
+  m_buffer.SetText(1, 0, text2, _countof(text) - 1);
+  m_buffer.SetColor(1, 0, 4, 0xff0000, 0x00ff00, 0x0000ff);
+  m_buffer.SetColor(1, 5, 9, 0xffff00, 0xff0000, 0xff0000);
+  m_buffer.SetColor(1, 10, 15, 0xffffff, 0x000000, 0xff0000);
+
   m_renderer.Init(window, FONT_NAME, [this]() { this->Render(); });
 
   m_width = m_renderer.GetWidth();
@@ -17,25 +38,25 @@ void Mterm::Init(void* window) {
   m_isInitialized = true;
 }
 
-void Mterm::Destroy() {
+void MTerm::Destroy() {
   m_renderer.Destroy();
 }
 
-bool Mterm::IsInitialized() {
+bool MTerm::IsInitialized() {
   return m_isInitialized;
 }
 
-void Mterm::Redraw() {
+void MTerm::Redraw() {
   m_renderer.Redraw();
 }
 
-void Mterm::Resize(unsigned int width, unsigned int height) {
+void MTerm::Resize(unsigned int width, unsigned int height) {
   m_width = width;
   m_height = height;
   m_renderer.Resize(width, height);
 }
 
-void Mterm::Render() {
+void MTerm::Render() {
   m_renderer.Clear(WINDOW_BG_COLOR);
 
   float size = BUTTON_SIZE - BUTTON_MARGIN;
@@ -48,36 +69,22 @@ void Mterm::Render() {
   m_renderer.Line(close_x - size, y + size, close_x + size, y - size, 1,
                   CLOSE_BUTTON_COLOR, 1);
 
-  const char32_t txt[] = U"Hello, wonderful world!";
-  m_renderer.Text(txt, _countof(txt), 16, 100.5, 100.5, 0xff0000, 0x00ff00,
-                  0x0000ff, 1);
+  m_buffer.Render(m_renderer, 50, 50, 200, 200, 0, 0, 14);
 }
 
-void Mterm::KeyDown(int key_code) {
+void MTerm::KeyDown(int key_code) {}
 
-}
+void MTerm::KeyUp(int key_code) {}
 
-void Mterm::KeyUp(int key_code) {
+void MTerm::Input(char32_t key) {}
 
-}
+void MTerm::MouseMove(int x, int y) {}
 
-void Mterm::Input(char32_t key) {
+void MTerm::MouseDown(int x, int y, int button) {}
 
-}
+void MTerm::MouseUp(int x, int y, int button) {}
 
-void Mterm::MouseMove(int x, int y) {
-
-}
-
-void Mterm::MouseDown(int x, int y, int button) {
-
-}
-
-void Mterm::MouseUp(int x, int y, int button) {
-  
-}
-
-void Mterm::Scroll(int x, int y, int delta) {
+void MTerm::Scroll(int x, int y, int delta) {
   // if (GetAsyncKeyState(VK_LCONTROL) & 0x8000) {
   //   float new_font_size = m_fontSize + delta;
   //   if (2 < new_font_size && new_font_size < 200) {
@@ -91,4 +98,4 @@ void Mterm::Scroll(int x, int y, int delta) {
   // }
 }
 
-}  // namespace Mterm
+}  // namespace MTerm

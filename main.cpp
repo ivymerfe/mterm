@@ -6,14 +6,14 @@
 
 #include <thread>
 
-#include "mterm.h"
+#include "MTerm.h"
 #include "resource.h"
 #include "defaults.h"
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 HWND g_hWindow;
-Mterm::Mterm g_Mterm;
+MTerm::MTerm g_MTerm;
 
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
@@ -72,7 +72,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
   UpdateWindow(g_hWindow);
 
   std::thread init_thread([]() {
-    g_Mterm.Init(g_hWindow);
+    g_MTerm.Init(g_hWindow);
   });
   init_thread.detach();
 
@@ -81,7 +81,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
-  g_Mterm.Destroy();
+  g_MTerm.Destroy();
   return 0;
 }
 
@@ -213,11 +213,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
       return 0;
     }
     case WM_SIZE: {
-      if (g_Mterm.IsInitialized()) {
+      if (g_MTerm.IsInitialized()) {
         UINT width = LOWORD(lParam);
         UINT height = HIWORD(lParam);
         if (width > WINDOW_MIN_WIDTH && height > WINDOW_MIN_HEIGHT) {
-          g_Mterm.Resize(width, height);
+          g_MTerm.Resize(width, height);
         }
       }
       return 0;
@@ -226,8 +226,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hWnd, &ps);
       EndPaint(hWnd, &ps);
-      if (g_Mterm.IsInitialized()) {
-        g_Mterm.Redraw();
+      if (g_MTerm.IsInitialized()) {
+        g_MTerm.Redraw();
       }
       return 0;
     }
@@ -245,14 +245,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
                                (ch - 0xDC00) + 0x10000;
           pending_high_surrogate = 0;
 
-          g_Mterm.Input(codepoint);
+          g_MTerm.Input(codepoint);
         } else {
           // Unexpected low surrogate — error or ignore
         }
       } else {
         char32_t codepoint = ch;
         pending_high_surrogate = 0;
-        g_Mterm.Input(codepoint);
+        g_MTerm.Input(codepoint);
       }
       return 0;
     }
@@ -279,11 +279,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
       break;
     }
     case WM_KEYDOWN: {
-      g_Mterm.KeyDown(wParam);
+      g_MTerm.KeyDown(wParam);
       break;
     }
     case WM_KEYUP: {
-      g_Mterm.KeyUp(wParam);
+      g_MTerm.KeyUp(wParam);
       break;
     }
     case WM_LBUTTONDOWN: {
@@ -293,14 +293,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
       break;
     }
     case WM_RBUTTONUP: {
-      g_Mterm.MouseUp(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), 1);
+      g_MTerm.MouseUp(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), 1);
       break;
     }
     case WM_MOUSEWHEEL: {
       short delta = GET_WHEEL_DELTA_WPARAM(wParam);
       int x = GET_X_LPARAM(lParam);
       int y = GET_Y_LPARAM(lParam);
-      g_Mterm.Scroll(x, y, delta / WHEEL_DELTA);
+      g_MTerm.Scroll(x, y, delta / WHEEL_DELTA);
       return 0;
     }
   }

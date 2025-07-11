@@ -1,4 +1,4 @@
-#include "renderer.h"
+#include "Renderer.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <d2d1.h>
@@ -22,7 +22,7 @@ static inline void ThrowIfFailed(HRESULT hr) {
   }
 }
 
-namespace Mterm {
+namespace MTerm {
 
 class Renderer::Impl {
  private:
@@ -429,4 +429,4 @@ float Renderer::GetLineHeight(float font_size) const {
   return m_impl->GetLineHeight(font_size);
 }
 
-}  // namespace Mterm
+}  // namespace MTerm

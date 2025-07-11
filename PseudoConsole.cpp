@@ -1,4 +1,4 @@
-#include "pty.h"
+#include "PseudoConsole.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include "Windows.h"
@@ -11,7 +11,7 @@
 
 #include "defaults.h"
 
-namespace Mterm {
+namespace MTerm {
 
 class PseudoConsole::Impl {
  private:
@@ -226,4 +226,4 @@ void PseudoConsole::Close() {
   m_impl->Close();
 }
 
-}  // namespace Mterm
+}  // namespace MTerm
