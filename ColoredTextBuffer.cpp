@@ -47,22 +47,22 @@ void ColoredTextBuffer::SetText(size_t line_index,
   }
 }
 
-void ColoredTextBuffer::ReplaceSubrange(
-    std::vector<Fragment>& fragments,
-    size_t start,
-    size_t end,
-    const std::vector<Fragment>& replacement) {
+void ColoredTextBuffer::ReplaceSubrange(std::vector<Fragment>& fragments,
+                                        size_t start,
+                                        size_t end,
+                                        const Fragment* replacement_ptr,
+                                        size_t replacement_size) {
   size_t old_len = end - start;
-  size_t new_len = replacement.size();
+  size_t new_len = replacement_size;
   size_t min_len = std::min(old_len, new_len);
 
   // Overwrite the common part
-  std::copy_n(replacement.begin(), min_len, fragments.begin() + start);
+  std::copy_n(replacement_ptr, min_len, fragments.begin() + start);
 
   if (new_len > old_len) {
     // Insert the remaining new elements
     fragments.insert(fragments.begin() + start + old_len,
-                     replacement.begin() + old_len, replacement.end());
+                     replacement_ptr + old_len, replacement_ptr + new_len);
   } else if (new_len < old_len) {
     // Erase the leftover elements
     fragments.erase(fragments.begin() + start + new_len,
@@ -70,17 +70,18 @@ void ColoredTextBuffer::ReplaceSubrange(
   }
 }
 
-void ColoredTextBuffer::MaybeAddFragment(std::vector<Fragment>& fragments,
+void ColoredTextBuffer::MaybeAddFragment(Fragment* fragments,
+                                         int& size,
                                          Fragment fragment) {
-  if (fragments.size() == 0) {
-    fragments.push_back(fragment);
+  if (size == 0) {
+    fragments[size++] = fragment;
     return;
   }
-  Fragment& back_fragment = fragments.back();
+  Fragment& back_fragment = fragments[size-1];
   if (fragment.color != back_fragment.color ||
       fragment.underline_color != back_fragment.underline_color ||
       fragment.background_color != back_fragment.background_color) {
-    fragments.push_back(fragment);
+    fragments[size++] = fragment;
   }
 }
 
@@ -116,19 +117,19 @@ void ColoredTextBuffer::SetColor(size_t line_index,
   int index_start = std::distance(fragments.begin(), it_start) - 1;
   int index_end = std::distance(fragments.begin(), it_end);
 
-  std::vector<Fragment> new_fragments;
-  new_fragments.reserve(5);
+  Fragment new_fragments[5];
+  int new_fragments_size = 0;
 
   Fragment& first = fragments[index_start];
   if (index_start > 0) {
     Fragment& prev = fragments[index_start - 1];
-    MaybeAddFragment(new_fragments, prev);
+    MaybeAddFragment(new_fragments, new_fragments_size, prev);
     index_start--;
   }
   if (first.pos < start_pos) {
-    MaybeAddFragment(new_fragments, first);
+    MaybeAddFragment(new_fragments, new_fragments_size, first);
   }
-  MaybeAddFragment(new_fragments,
+  MaybeAddFragment(new_fragments, new_fragments_size,
                    {start_pos, color, underline_color, background_color});
 
   int moved_right = end_pos + 1;
@@ -141,14 +142,15 @@ void ColoredTextBuffer::SetColor(size_t line_index,
   if (moved_right < next_begin) {
     Fragment last = fragments[index_end - 1];
     last.pos = moved_right;
-    MaybeAddFragment(new_fragments, last);
+    MaybeAddFragment(new_fragments, new_fragments_size, last);
   }
   if (index_end < fragments.size()) {
-    MaybeAddFragment(new_fragments, fragments[index_end]);
+    MaybeAddFragment(new_fragments, new_fragments_size, fragments[index_end]);
     index_end += 1;  // Replace this element too
   }
 
-  ReplaceSubrange(fragments, index_start, index_end, new_fragments);
+  ReplaceSubrange(fragments, index_start, index_end, new_fragments,
+                  new_fragments_size);
 }
 
 // AI generated

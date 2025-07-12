@@ -50,12 +50,13 @@ class ColoredTextBuffer {
               float font_size);
 
  private:
-  static void ReplaceSubrange(std::vector<Fragment>& frag,
+  static void ReplaceSubrange(std::vector<Fragment>& fragments,
                               size_t start,
                               size_t end,
-                              const std::vector<Fragment>& replacement);
+                              const Fragment* replacement_ptr,
+                              size_t replacement_size);
 
-  static void MaybeAddFragment(std::vector<Fragment>& fragments, Fragment fragment);
+  static void MaybeAddFragment(Fragment* fragments, int& size, Fragment fragment);
 
   std::deque<Line> m_lines;
 };
