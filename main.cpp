@@ -14,6 +14,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 HWND g_hWindow;
 MTerm::MTerm g_MTerm;
+int g_nCmdShow = SW_SHOWNORMAL;
 
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
@@ -68,8 +69,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
   if (g_hWindow == NULL) {
     return 0;
   }
-  ShowWindow(g_hWindow, nCmdShow);
-  UpdateWindow(g_hWindow);
+  g_nCmdShow = nCmdShow;
 
   std::thread init_thread([]() {
     g_MTerm.Init(g_hWindow);
@@ -135,6 +135,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
                             WPARAM wParam,
                             LPARAM lParam) {
   static wchar_t pending_high_surrogate = 0;
+  static bool is_sizing = false;
 
   switch (uMsg) {
     case WM_CREATE: {
@@ -222,13 +223,25 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
       }
       return 0;
     }
+    case WM_ENTERSIZEMOVE: {
+      is_sizing = true;
+      break;
+    }
+    case WM_EXITSIZEMOVE: {
+      is_sizing = false;
+      break;
+    }
     case WM_PAINT: {
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hWnd, &ps);
       EndPaint(hWnd, &ps);
-      if (g_MTerm.IsInitialized()) {
+      if (g_MTerm.IsInitialized() && !is_sizing) {
         g_MTerm.Redraw();
       }
+      return 0;
+    }
+    case WM_APP + 1: {
+      ShowWindow(hWnd, g_nCmdShow);
       return 0;
     }
     case WM_CHAR: {

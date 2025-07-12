@@ -117,6 +117,8 @@ void ColoredTextBuffer::SetColor(size_t line_index,
   int index_end = std::distance(fragments.begin(), it_end);
 
   std::vector<Fragment> new_fragments;
+  new_fragments.reserve(5);
+
   Fragment& first = fragments[index_start];
   if (index_start > 0) {
     Fragment& prev = fragments[index_start - 1];

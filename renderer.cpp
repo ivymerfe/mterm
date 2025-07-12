@@ -48,13 +48,16 @@ class Renderer::Impl {
   std::vector<unsigned short> m_textBuffer;
   unsigned int m_textBufferPos = 0;
 
-  std::atomic<long long> m_renderVersion = 0;
+  std::atomic<long long> m_contentVersion = 0;
+  std::atomic<long long> m_renderedVersion = 0;
   std::atomic<bool> m_stopRendering = false;
   std::thread m_renderThread;
   std::mutex m_renderMutex;
   std::condition_variable m_renderCv;
   std::atomic<bool> m_windowResized = false;
   std::mutex m_resizeMutex;
+
+  bool m_firstRender = false;
 
  public:
   bool Init(void* window,
@@ -75,7 +78,7 @@ class Renderer::Impl {
     m_windowSize.height = window_rect.bottom - window_rect.top;
 
     D2D1_RENDER_TARGET_PROPERTIES props =
-        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_SOFTWARE);
+        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_HARDWARE);
     D2D1_HWND_RENDER_TARGET_PROPERTIES hwnd_props =
         D2D1::HwndRenderTargetProperties(m_hWindow, m_windowSize);
 
@@ -103,8 +106,10 @@ class Renderer::Impl {
     m_wcharIndexesVector.resize(0xFFFF + 1);
 
     m_renderThread = std::thread([this]() { this->RenderThread(); });
+    Redraw();
 
     m_isInitialized = true;
+    m_firstRender = true;
     return true;
   }
 
@@ -117,35 +122,39 @@ class Renderer::Impl {
   }
 
   void Redraw() {
-    m_renderVersion.fetch_add(1);
+    m_contentVersion.fetch_add(1);
     m_renderCv.notify_one();
   }
 
   void RenderThread() {
     std::unique_lock<std::mutex> lock(m_renderMutex);
-    long long rendered_version = -1;
     while (true) {
-      m_renderCv.wait(lock, [this, &rendered_version]() {
-        return rendered_version != m_renderVersion.load() ||
+      m_renderCv.wait(lock, [this]() {
+        return m_renderedVersion.load() != m_contentVersion.load() ||
                this->m_stopRendering.load();
       });
 
       if (m_stopRendering.load()) {
         break;
       }
-      rendered_version = m_renderVersion.load();
       std::unique_lock lock(m_resizeMutex);
       Render();
     }
   }
 
   void Render() {
+    m_renderedVersion.store(m_contentVersion.load());
     m_renderTarget->BeginDraw();
 
     m_textBufferPos = 0;
     m_renderCallback();
 
     ThrowIfFailed(m_renderTarget->EndDraw());
+
+    if (m_firstRender) {
+      PostMessage(m_hWindow, WM_APP + 1, 0, 0);
+      m_firstRender = false;
+    }
   }
 
   void Resize(unsigned int width, unsigned int height) {
