@@ -47,7 +47,43 @@ void ColoredTextBuffer::SetText(size_t line_index,
   }
 }
 
-// TODO: Not verified.
+void ColoredTextBuffer::ReplaceSubrange(
+    std::vector<Fragment>& fragments,
+    size_t start,
+    size_t end,
+    const std::vector<Fragment>& replacement) {
+  size_t old_len = end - start;
+  size_t new_len = replacement.size();
+  size_t min_len = std::min(old_len, new_len);
+
+  // Overwrite the common part
+  std::copy_n(replacement.begin(), min_len, fragments.begin() + start);
+
+  if (new_len > old_len) {
+    // Insert the remaining new elements
+    fragments.insert(fragments.begin() + start + old_len,
+                     replacement.begin() + old_len, replacement.end());
+  } else if (new_len < old_len) {
+    // Erase the leftover elements
+    fragments.erase(fragments.begin() + start + new_len,
+                    fragments.begin() + end);
+  }
+}
+
+void ColoredTextBuffer::MaybeAddFragment(std::vector<Fragment>& fragments,
+                                         Fragment fragment) {
+  if (fragments.size() == 0) {
+    fragments.push_back(fragment);
+    return;
+  }
+  Fragment& back_fragment = fragments.back();
+  if (fragment.color != back_fragment.color ||
+      fragment.underline_color != back_fragment.underline_color ||
+      fragment.background_color != back_fragment.background_color) {
+    fragments.push_back(fragment);
+  }
+}
+
 void ColoredTextBuffer::SetColor(size_t line_index,
                                  int start_pos,
                                  int end_pos,
@@ -78,58 +114,39 @@ void ColoredTextBuffer::SetColor(size_t line_index,
 
   // Since we want last element which is <= start_pos
   int index_start = std::distance(fragments.begin(), it_start) - 1;
-  int index_end = std::distance(fragments.begin(), it_end) - 1;
+  int index_end = std::distance(fragments.begin(), it_end);
 
-  int index_current = index_start;
-  int erase_start = index_start + 1;
-  int erase_end = index_end;
+  std::vector<Fragment> new_fragments;
+  Fragment& first = fragments[index_start];
+  if (index_start > 0) {
+    Fragment& prev = fragments[index_start - 1];
+    MaybeAddFragment(new_fragments, prev);
+    index_start--;
+  }
+  if (first.pos < start_pos) {
+    MaybeAddFragment(new_fragments, first);
+  }
+  MaybeAddFragment(new_fragments,
+                   {start_pos, color, underline_color, background_color});
 
   int moved_right = end_pos + 1;
   int next_begin;
-  if (index_end == fragments.size() - 1) {
+  if (index_end == fragments.size()) {
     next_begin = line_last_pos + 1;
   } else {
-    next_begin = fragments[index_end + 1].pos;
+    next_begin = fragments[index_end].pos;
   }
   if (moved_right < next_begin) {
-    Fragment& last = fragments[index_end];
-    if (index_end > index_start) {
-      last.pos = moved_right;
-      erase_end--;
-    } else {
-      fragments.insert(fragments.begin() + erase_end + 1,
-                       {moved_right, last.color, last.underline_color,
-                        last.background_color});
-    }
+    Fragment last = fragments[index_end - 1];
+    last.pos = moved_right;
+    MaybeAddFragment(new_fragments, last);
+  }
+  if (index_end < fragments.size()) {
+    MaybeAddFragment(new_fragments, fragments[index_end]);
+    index_end += 1;  // Replace this element too
   }
 
-  Fragment& prev = fragments[index_start];
-  if (prev.pos == start_pos) {
-    prev.color = color;
-    prev.underline_color = underline_color;
-    prev.background_color = background_color;
-  } else {
-    if (prev.color != color || prev.underline_color != underline_color ||
-        prev.background_color != background_color) {
-      fragments.insert(fragments.begin() + erase_start,
-                       {start_pos, color, underline_color, background_color});
-      index_current++;
-      erase_start++;
-      erase_end++;
-    }
-  }
-
-  if (erase_start <= erase_end) {
-    fragments.erase(fragments.begin() + erase_start,
-                    fragments.begin() + erase_end);
-  }
-  if (index_current < fragments.size() - 1) {
-    Fragment& next = fragments[index_current + 1];
-    if (next.color == color && next.underline_color == underline_color &&
-        next.background_color == background_color) {
-      fragments.erase(fragments.begin() + index_current + 1);
-    }
-  }
+  ReplaceSubrange(fragments, index_start, index_end, new_fragments);
 }
 
 // AI generated
