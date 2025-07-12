@@ -1,14 +1,15 @@
 #include "Utils.h"
 
 #include <stdexcept>
+#include "Windows.h"
 
 namespace MTerm {
 
-std::vector<char32_t> Utils::Utf8ToUtf32(const std::vector<char>& utf8) {
+std::vector<char32_t> Utils::Utf8ToUtf32(const char* utf8, size_t size) {
   std::vector<char32_t> utf32;
   size_t i = 0;
 
-  while (i < utf8.size()) {
+  while (i < size) {
     uint32_t codepoint = 0;
     uint8_t byte = utf8[i];
 
@@ -18,20 +19,20 @@ std::vector<char32_t> Utils::Utf8ToUtf32(const std::vector<char>& utf8) {
       i += 1;
     } else if ((byte & 0xE0) == 0xC0) {
       // 2-byte sequence
-      if (i + 1 >= utf8.size())
+      if (i + 1 >= size)
         throw std::runtime_error("Truncated UTF-8 sequence");
       codepoint = ((byte & 0x1F) << 6) | (utf8[i + 1] & 0x3F);
       i += 2;
     } else if ((byte & 0xF0) == 0xE0) {
       // 3-byte sequence
-      if (i + 2 >= utf8.size())
+      if (i + 2 >= size)
         throw std::runtime_error("Truncated UTF-8 sequence");
       codepoint = ((byte & 0x0F) << 12) | ((utf8[i + 1] & 0x3F) << 6) |
                   (utf8[i + 2] & 0x3F);
       i += 3;
     } else if ((byte & 0xF8) == 0xF0) {
       // 4-byte sequence
-      if (i + 3 >= utf8.size())
+      if (i + 3 >= size)
         throw std::runtime_error("Truncated UTF-8 sequence");
       codepoint = ((byte & 0x07) << 18) | ((utf8[i + 1] & 0x3F) << 12) |
                   ((utf8[i + 2] & 0x3F) << 6) | (utf8[i + 3] & 0x3F);
@@ -131,6 +132,32 @@ std::vector<std::vector<char32_t>> Utils::SplitByLines(
   }
 
   return lines;
+}
+
+std::optional<std::string> Utils::GetFileContent(const char* filename) {
+  HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
+                             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+  if (hFile == INVALID_HANDLE_VALUE) {
+    return std::nullopt;
+  }
+
+  DWORD fileSize = GetFileSize(hFile, NULL);
+  if (fileSize == INVALID_FILE_SIZE || fileSize == 0) {
+    CloseHandle(hFile);
+    return std::nullopt;
+  }
+
+  std::string content(fileSize, '\0');
+  DWORD bytesRead = 0;
+  BOOL success = ReadFile(hFile, &content[0], fileSize, &bytesRead, NULL);
+  CloseHandle(hFile);
+
+  if (!success || bytesRead != fileSize) {
+    return std::nullopt;
+  }
+
+  return content;
 }
 
 }  // namespace MTerm

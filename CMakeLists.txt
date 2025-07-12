@@ -11,6 +11,7 @@ project ("mterm")
 add_compile_definitions(UNICODE _UNICODE)
 
 add_executable (mterm WIN32 "main.cpp" "resource.rc" "defaults.h" "MTerm.cpp" "MTerm.h" "Utils.h" "Utils.cpp" "PseudoConsole.h" "PseudoConsole.cpp" "Renderer.h" "Renderer.cpp" "ColoredTextBuffer.h" "ColoredTextBuffer.cpp")
-target_link_libraries (mterm dxguid.lib d2d1.lib dwrite.lib)
+
+target_link_libraries (mterm PRIVATE dxguid.lib d2d1.lib dwrite.lib ${CMAKE_SOURCE_DIR}/lib/wren.lib)
 
 set_property(TARGET mterm PROPERTY CXX_STANDARD 20)

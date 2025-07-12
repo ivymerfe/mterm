@@ -1,6 +1,11 @@
 #pragma once
 
+#include <mutex>
+#include <string>
+#include <unordered_map>
 #include <vector>
+
+#include "wren/wren.hpp"
 
 #include "ColoredTextBuffer.h"
 #include "Renderer.h"
@@ -15,6 +20,18 @@ class MTerm {
   void Destroy();
 
   bool IsInitialized();
+
+  static WrenLoadModuleResult LoadModule(WrenVM* vm, const char* name);
+
+  static WrenForeignClassMethods BindForeignClass(WrenVM* vm,
+                                                  const char* module,
+                                                  const char* className);
+
+  static WrenForeignMethodFn BindForeignMethod(WrenVM* vm,
+                                               const char* module,
+                                               const char* className,
+                                               bool isStatic,
+                                               const char* signature);
 
   void Redraw();
   void Resize(unsigned int width, unsigned int height);
@@ -38,6 +55,12 @@ class MTerm {
 
   Renderer m_renderer;
   ColoredTextBuffer m_buffer;
+
+  WrenVM* m_vm;
+  std::unordered_map<std::string, std::string> m_sources;
+  std::mutex m_vmMutex;
+  WrenHandle* m_appInstanceHandle;
+  WrenHandle* m_renderMethodHandle;
 };
 
 }  // namespace MTerm

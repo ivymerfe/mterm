@@ -1,47 +1,74 @@
 #include "MTerm.h"
 
 #include <algorithm>
+#include <cstdio>
 
+#include "Utils.h"
 #include "defaults.h"
 
+extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(
+    const char* lpOutputString);
+
 namespace MTerm {
+
+static void WrenPrint(WrenVM* vm, const char* text) {
+  OutputDebugStringA(text);
+}
+
+static void WrenError(WrenVM* vm,
+                      WrenErrorType type,
+                      const char* module,
+                      int line,
+                      const char* message) {
+  OutputDebugStringA("Error in module ");
+  OutputDebugStringA(module);
+  OutputDebugStringA(" at line ");
+  char buf[64];
+  sprintf(buf, "%d", line);
+  OutputDebugStringA(buf);
+  OutputDebugStringA(" : ");
+  OutputDebugStringA(message);
+  OutputDebugStringA("\n");
+}
 
 MTerm::MTerm() {}
 
 void MTerm::Init(void* window) {
-  const char32_t text[] = U"I love you, wrld";
-  m_buffer.AddLine();
-  m_buffer.SetText(0, 0, text, _countof(text) - 1);
-  m_buffer.SetColor(0, 0, 4, 0xff0000, 0x00ff00, 0x0000ff);
-  m_buffer.SetColor(0, 5, 9, 0xffff00, 0xff0000, 0xff0000);
-  m_buffer.SetColor(0, 10, 15, 0xffffff, 0x000000, 0xff0000);
-  m_buffer.SetColor(0, 10, 15, 0xffffff, 0x000000, 0xff0000);
-  m_buffer.SetColor(0, 12, 13, 0xff00ff, 0x000000, 0xff0000);
-  m_buffer.SetColor(0, 11, 15, 0xffffff, 0x000000, 0xff0000);
-  m_buffer.SetColor(0, 12, 15, 0xffffff, 0x000000, 0xff0000);
-  m_buffer.SetColor(0, 12, 13, 0x0f0fff, 0x00f000, 0xff00f0);
+  WrenConfiguration config;
+  wrenInitConfiguration(&config);
+  config.writeFn = &WrenPrint;
+  config.errorFn = &WrenError;
+  config.loadModuleFn = MTerm::LoadModule;
+  config.bindForeignClassFn = MTerm::BindForeignClass;
+  config.bindForeignMethodFn = MTerm::BindForeignMethod;
+  config.userData = this;
+  m_vm = wrenNewVM(
+      &config);  // TODO - takes around 13ms. Maybe do it in separate thread
 
-  m_buffer.SetColor(0, 1, 2, 0xffff00, 0x00ff00, 0x000000);
-  m_buffer.SetColor(0, 1, 3, 0xff0000, 0x00ff00, 0x0000ff);
+  WrenInterpretResult result = wrenInterpret(m_vm, NULL, "import \"main\"");
+  if (result != WREN_RESULT_SUCCESS) {
+    throw std::exception("Failed to load core module.");
+  }
+  wrenEnsureSlots(m_vm, 1);
+  wrenGetVariable(m_vm, "main", "App", 0);
+  WrenHandle* app_class_handle = wrenGetSlotHandle(m_vm, 0);
 
-  const char32_t text2[] = U"I hate you, wrld";
-  m_buffer.AddLine();
-  m_buffer.SetText(1, 0, text2, _countof(text2) - 1);
-  m_buffer.SetColor(1, 0, 4, 0xff0000, 0x00ff00, 0x0000ff);
-  m_buffer.SetColor(1, 5, 9, 0xffff00, 0xff0000, 0xff0000);
-  m_buffer.SetColor(1, 10, 15, 0xffffff, 0x000000, 0xff0000);
+  // Call App.new() to create an instance
+  WrenHandle* constructorHandle = wrenMakeCallHandle(m_vm, "new()");
+  wrenEnsureSlots(m_vm, 1);
+  wrenSetSlotHandle(m_vm, 0, app_class_handle);
+  result = wrenCall(m_vm, constructorHandle);
+  wrenReleaseHandle(m_vm, constructorHandle);
 
-  const char32_t text3[] = U"I>hope>this>line>has>one>fragment";
-  m_buffer.AddLine();
-  m_buffer.SetText(2, 0, text3, _countof(text3) - 1);
-  m_buffer.SetColor(2, 0, _countof(text3)-1, 0xff0000, 0, 0);
-  m_buffer.SetColor(2, 2, 4, 0xfff0a0, 0, 0);
-  m_buffer.SetColor(2, 3, 5, 0x050ff0, 0, 0);
-  m_buffer.SetColor(2, 6, 8, 0xffff00, 0, 0);
-  m_buffer.SetColor(2, 7, 9, 0xaa00f0, 0, 0);
-  m_buffer.SetColor(2, 8, 10, 0x652050, 0, 0);
-  m_buffer.SetColor(2, 9, 11, 0xff00ff, 0, 0);
-  m_buffer.SetColor(2, 1, 20, 0xff0000, 0, 0);
+  if (result != WREN_RESULT_SUCCESS) {
+    throw std::exception("Failed to instantiate App class.");
+  }
+
+  // Store instance handle
+  m_appInstanceHandle = wrenGetSlotHandle(m_vm, 0);
+
+  // Prepare method call handle (instance method, not class method!)
+  m_renderMethodHandle = wrenMakeCallHandle(m_vm, "render()");
 
   m_renderer.Init(window, FONT_NAME, [this]() { this->Render(); });
 
@@ -53,10 +80,150 @@ void MTerm::Init(void* window) {
 
 void MTerm::Destroy() {
   m_renderer.Destroy();
+  wrenFreeVM(m_vm);
 }
 
 bool MTerm::IsInitialized() {
   return m_isInitialized;
+}
+
+WrenLoadModuleResult MTerm::LoadModule(WrenVM* vm, const char* name) {
+  std::string path = "modules/" + std::string(name) + ".wren";
+  MTerm* this_ptr = (MTerm*)wrenGetUserData(vm);
+  std::unordered_map<std::string, std::string>& source_map =
+      this_ptr->m_sources;
+  WrenLoadModuleResult result = {0};
+  if (source_map.contains(path)) {
+    result.source = source_map[path].c_str();
+  } else {
+    auto file_read_result = Utils::GetFileContent(path.c_str());
+
+    if (file_read_result.has_value()) {
+      source_map[path] = file_read_result.value();
+      result.source = source_map[path].c_str();
+    }
+  }
+  return result;
+}
+
+WrenForeignClassMethods MTerm::BindForeignClass(WrenVM* vm,
+                                                const char* module,
+                                                const char* className) {
+  WrenForeignClassMethods methods = {};
+
+  if (std::string(module) == "renderer" &&
+      std::string(className) == "Renderer") {
+    methods.allocate = [](WrenVM* vm) {
+      MTerm* term = static_cast<MTerm*>(wrenGetUserData(vm));
+      // Store pointer to renderer in foreign object slot
+      Renderer** rendererPtr =
+          (Renderer**)wrenSetSlotNewForeign(vm, 0, 0, sizeof(Renderer*));
+      *rendererPtr = &term->m_renderer;
+    };
+
+    methods.finalize = [](void* data) {
+      // no-op: renderer is owned by MTerm
+    };
+  }
+
+  return methods;
+}
+
+WrenForeignMethodFn MTerm::BindForeignMethod(WrenVM* vm,
+                                             const char* module,
+                                             const char* className,
+                                             bool isStatic,
+                                             const char* signature) {
+  if (std::string(module) == "renderer" &&
+      std::string(className) == "Renderer") {
+    if (std::string(signature) == "clear(_)") {
+      return [](WrenVM* vm) {
+        Renderer* r = *(Renderer**)wrenGetSlotForeign(vm, 0);
+        int color = (int)wrenGetSlotDouble(vm, 1);
+        r->Clear(color);
+      };
+    }
+
+    if (std::string(signature) == "line(_,_,_,_,_,_,_)") {
+      return [](WrenVM* vm) {
+        Renderer* r = *(Renderer**)wrenGetSlotForeign(vm, 0);
+        float x1 = (float)wrenGetSlotDouble(vm, 1);
+        float y1 = (float)wrenGetSlotDouble(vm, 2);
+        float x2 = (float)wrenGetSlotDouble(vm, 3);
+        float y2 = (float)wrenGetSlotDouble(vm, 4);
+        float thickness = (float)wrenGetSlotDouble(vm, 5);
+        int color = (int)wrenGetSlotDouble(vm, 6);
+        float opacity = (float)wrenGetSlotDouble(vm, 7);
+        r->Line(x1, y1, x2, y2, thickness, color, opacity);
+      };
+    }
+
+    if (std::string(signature) == "rect(_,_,_,_,_,_)") {
+      return [](WrenVM* vm) {
+        Renderer* r = *(Renderer**)wrenGetSlotForeign(vm, 0);
+        float l = (float)wrenGetSlotDouble(vm, 1);
+        float t = (float)wrenGetSlotDouble(vm, 2);
+        float rgt = (float)wrenGetSlotDouble(vm, 3);
+        float btm = (float)wrenGetSlotDouble(vm, 4);
+        int color = (int)wrenGetSlotDouble(vm, 5);
+        float opacity = (float)wrenGetSlotDouble(vm, 6);
+        r->Rect(l, t, rgt, btm, color, opacity);
+      };
+    }
+
+    if (std::string(signature) == "outline(_,_,_,_,_,_,_)") {
+      return [](WrenVM* vm) {
+        Renderer* r = *(Renderer**)wrenGetSlotForeign(vm, 0);
+        float l = (float)wrenGetSlotDouble(vm, 1);
+        float t = (float)wrenGetSlotDouble(vm, 2);
+        float rgt = (float)wrenGetSlotDouble(vm, 3);
+        float btm = (float)wrenGetSlotDouble(vm, 4);
+        float thickness = (float)wrenGetSlotDouble(vm, 5);
+        int color = (int)wrenGetSlotDouble(vm, 6);
+        float opacity = (float)wrenGetSlotDouble(vm, 7);
+        r->Outline(l, t, rgt, btm, thickness, color, opacity);
+      };
+    }
+
+    if (std::string(signature) == "text(_,_,_,_,_,_,_,_)") {
+      return [](WrenVM* vm) {
+        Renderer* r = *(Renderer**)wrenGetSlotForeign(vm, 0);
+
+        const char* utf8_text = wrenGetSlotString(vm, 1);
+        std::vector<char32_t> u32_text =
+            Utils::Utf8ToUtf32(utf8_text, strlen(utf8_text));
+        float fontSize = (float)wrenGetSlotDouble(vm, 2);
+        float x = (float)wrenGetSlotDouble(vm, 3);
+        float y = (float)wrenGetSlotDouble(vm, 4);
+        int color = (int)wrenGetSlotDouble(vm, 5);
+        int underlineColor = (int)wrenGetSlotDouble(vm, 6);
+        int backgroundColor = (int)wrenGetSlotDouble(vm, 7);
+        float opacity = (float)wrenGetSlotDouble(vm, 8);
+
+        r->Text(u32_text.data(), (int)u32_text.size(), fontSize, x, y, color,
+                underlineColor, backgroundColor, opacity);
+      };
+    }
+  }
+  if (std::strcmp(module, "main") == 0 && std::strcmp(className, "App") == 0 &&
+      isStatic) {
+    MTerm* self = static_cast<MTerm*>(wrenGetUserData(vm));
+
+    if (std::strcmp(signature, "getWidth()") == 0) {
+      return [](WrenVM* vm) {
+        MTerm* self = static_cast<MTerm*>(wrenGetUserData(vm));
+        wrenSetSlotDouble(vm, 0, self->m_width);
+      };
+    }
+
+    if (std::strcmp(signature, "getHeight()") == 0) {
+      return [](WrenVM* vm) {
+        MTerm* self = static_cast<MTerm*>(wrenGetUserData(vm));
+        wrenSetSlotDouble(vm, 0, self->m_height);
+      };
+    }
+  }
+  return nullptr;  // Not found
 }
 
 void MTerm::Redraw() {
@@ -70,19 +237,12 @@ void MTerm::Resize(unsigned int width, unsigned int height) {
 }
 
 void MTerm::Render() {
-  m_renderer.Clear(WINDOW_BG_COLOR);
-
-  float size = BUTTON_SIZE - BUTTON_MARGIN;
-  float y = CAPTION_SIZE - size - BUTTON_OFFSET;
-  float min_x = m_width - MIN_BUTTON_OFFSET;
-  float close_x = m_width - CLOSE_BUTTON_OFFSET;
-  m_renderer.Rect(min_x - size, y, min_x + size, y + 1, MIN_BUTTON_COLOR, 1);
-  m_renderer.Line(close_x - size, y - size, close_x + size, y + size, 1,
-                  CLOSE_BUTTON_COLOR, 1);
-  m_renderer.Line(close_x - size, y + size, close_x + size, y - size, 1,
-                  CLOSE_BUTTON_COLOR, 1);
-
-  m_buffer.Render(m_renderer, 50, 50, 500, 200, 0, 0, 14);
+  wrenEnsureSlots(m_vm, 1);
+  wrenSetSlotHandle(m_vm, 0, m_appInstanceHandle);
+  WrenInterpretResult result = wrenCall(m_vm, m_renderMethodHandle);
+  if (result != WREN_RESULT_SUCCESS) {
+    OutputDebugStringA("Failed to invoke render()\n");
+  }
 }
 
 void MTerm::KeyDown(int key_code) {}

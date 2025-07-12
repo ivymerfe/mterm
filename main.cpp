@@ -14,7 +14,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 HWND g_hWindow;
 MTerm::MTerm g_MTerm;
-int g_nCmdShow = SW_SHOWNORMAL;
 
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
@@ -27,7 +26,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
   windowClass.hInstance = hInstance;
   windowClass.lpszClassName = CLASS_NAME;
   windowClass.hCursor = LoadCursor(NULL, IDC_IBEAM);
-  windowClass.hbrBackground = CreateSolidBrush(WINDOW_BG_COLOR);
+  windowClass.hbrBackground = 0;
   windowClass.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON),
                                        IMAGE_ICON, 128, 128, LR_DEFAULTCOLOR);
   windowClass.hIconSm =
@@ -69,7 +68,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
   if (g_hWindow == NULL) {
     return 0;
   }
-  g_nCmdShow = nCmdShow;
+  ShowWindow(g_hWindow, nCmdShow);
 
   std::thread init_thread([]() {
     g_MTerm.Init(g_hWindow);
@@ -214,6 +213,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
       return 0;
     }
     case WM_SIZE: {
+      is_sizing = true;
       if (g_MTerm.IsInitialized()) {
         UINT width = LOWORD(lParam);
         UINT height = HIWORD(lParam);
@@ -223,25 +223,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd,
       }
       return 0;
     }
-    case WM_ENTERSIZEMOVE: {
-      is_sizing = true;
-      break;
-    }
-    case WM_EXITSIZEMOVE: {
-      is_sizing = false;
-      break;
+    case WM_ERASEBKGND: {
+      return 0;
     }
     case WM_PAINT: {
-      PAINTSTRUCT ps;
-      HDC hdc = BeginPaint(hWnd, &ps);
-      EndPaint(hWnd, &ps);
+      ValidateRect(hWnd, NULL);
       if (g_MTerm.IsInitialized() && !is_sizing) {
         g_MTerm.Redraw();
       }
-      return 0;
-    }
-    case WM_APP + 1: {
-      ShowWindow(hWnd, g_nCmdShow);
+      is_sizing = false;
       return 0;
     }
     case WM_CHAR: {

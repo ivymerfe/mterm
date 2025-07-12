@@ -57,8 +57,6 @@ class Renderer::Impl {
   std::atomic<bool> m_windowResized = false;
   std::mutex m_resizeMutex;
 
-  bool m_firstRender = false;
-
  public:
   bool Init(void* window,
             const wchar_t* font_name,
@@ -109,7 +107,6 @@ class Renderer::Impl {
     Redraw();
 
     m_isInitialized = true;
-    m_firstRender = true;
     return true;
   }
 
@@ -150,11 +147,6 @@ class Renderer::Impl {
     m_renderCallback();
 
     ThrowIfFailed(m_renderTarget->EndDraw());
-
-    if (m_firstRender) {
-      PostMessage(m_hWindow, WM_APP + 1, 0, 0);
-      m_firstRender = false;
-    }
   }
 
   void Resize(unsigned int width, unsigned int height) {
