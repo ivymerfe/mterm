@@ -2,14 +2,16 @@
 
 #include <algorithm>
 
-#include "Renderer.h"
-
 namespace MTerm {
 
 ColoredTextBuffer::ColoredTextBuffer() {}
 
 void ColoredTextBuffer::AddLine() {
   m_lines.emplace_back();
+}
+
+std::deque<ColoredLine>& ColoredTextBuffer::GetLines() {
+  return m_lines;
 }
 
 void ColoredTextBuffer::WriteToLine(size_t line_index,
@@ -47,10 +49,10 @@ void ColoredTextBuffer::SetText(size_t line_index,
   }
 }
 
-void ColoredTextBuffer::ReplaceSubrange(std::vector<Fragment>& fragments,
+void ColoredTextBuffer::ReplaceSubrange(std::vector<LineFragment>& fragments,
                                         size_t start,
                                         size_t end,
-                                        const Fragment* replacement_ptr,
+                                        const LineFragment* replacement_ptr,
                                         size_t replacement_size) {
   size_t old_len = end - start;
   size_t new_len = replacement_size;
@@ -70,14 +72,14 @@ void ColoredTextBuffer::ReplaceSubrange(std::vector<Fragment>& fragments,
   }
 }
 
-void ColoredTextBuffer::MaybeAddFragment(Fragment* fragments,
+void ColoredTextBuffer::MaybeAddFragment(LineFragment* fragments,
                                          int& size,
-                                         Fragment fragment) {
+                                         LineFragment fragment) {
   if (size == 0) {
     fragments[size++] = fragment;
     return;
   }
-  Fragment& back_fragment = fragments[size-1];
+  LineFragment& back_fragment = fragments[size-1];
   if (fragment.color != back_fragment.color ||
       fragment.underline_color != back_fragment.underline_color ||
       fragment.background_color != back_fragment.background_color) {
@@ -107,22 +109,22 @@ void ColoredTextBuffer::SetColor(size_t line_index,
 
   auto it_start = std::upper_bound(
       fragments.begin(), fragments.end(), start_pos,
-      [](int pos, const Fragment& frag) { return pos < frag.pos; });
+      [](int pos, const LineFragment& frag) { return pos < frag.pos; });
 
   auto it_end = std::upper_bound(
       fragments.begin(), fragments.end(), end_pos,
-      [](int pos, const Fragment& frag) { return pos < frag.pos; });
+      [](int pos, const LineFragment& frag) { return pos < frag.pos; });
 
   // Since we want last element which is <= start_pos
   int index_start = std::distance(fragments.begin(), it_start) - 1;
   int index_end = std::distance(fragments.begin(), it_end);
 
-  Fragment new_fragments[5];
+  LineFragment new_fragments[5];
   int new_fragments_size = 0;
 
-  Fragment& first = fragments[index_start];
+  LineFragment& first = fragments[index_start];
   if (index_start > 0) {
-    Fragment& prev = fragments[index_start - 1];
+    LineFragment& prev = fragments[index_start - 1];
     MaybeAddFragment(new_fragments, new_fragments_size, prev);
     index_start--;
   }
@@ -140,7 +142,7 @@ void ColoredTextBuffer::SetColor(size_t line_index,
     next_begin = fragments[index_end].pos;
   }
   if (moved_right < next_begin) {
-    Fragment last = fragments[index_end - 1];
+    LineFragment last = fragments[index_end - 1];
     last.pos = moved_right;
     MaybeAddFragment(new_fragments, new_fragments_size, last);
   }
@@ -151,75 +153,6 @@ void ColoredTextBuffer::SetColor(size_t line_index,
 
   ReplaceSubrange(fragments, index_start, index_end, new_fragments,
                   new_fragments_size);
-}
-
-// AI generated
-void ColoredTextBuffer::Render(Renderer& renderer,
-                               float left,
-                               float top,
-                               float width,
-                               float height,
-                               int x_offset_chars,
-                               int y_offset_lines,
-                               float font_size) {
-  float y = top;
-  float line_height = ceil(renderer.GetLineHeight(font_size));
-  float advance = renderer.GetAdvance(font_size);
-
-  int max_visible_chars = static_cast<int>(width / advance);
-
-  for (size_t i = y_offset_lines; i < m_lines.size(); ++i) {
-    if (y > top + height)
-      break;
-
-    const auto& line = m_lines[i];
-    const auto& text = line.text;
-    const auto& fragments = line.fragments;
-
-    // Binary search for first relevant fragment
-    auto frag_less = [](const Fragment& frag, int pos) {
-      return frag.pos < pos;
-    };
-    auto it = std::lower_bound(fragments.begin(), fragments.end(),
-                               x_offset_chars, frag_less);
-
-    if (it != fragments.begin() &&
-        (it == fragments.end() || it->pos > x_offset_chars)) {
-      --it;
-    }
-
-    int remaining_chars = max_visible_chars;
-    for (; it != fragments.end(); ++it) {
-      int frag_start = it->pos;
-      size_t frag_index = std::distance(fragments.begin(), it);
-      int frag_end = (frag_index + 1 < fragments.size())
-                         ? fragments[frag_index + 1].pos
-                         : static_cast<int>(text.size());
-
-      if (frag_end <= x_offset_chars)
-        continue;
-      if (frag_start >= static_cast<int>(text.size()))
-        break;
-
-      int visible_start = std::max(frag_start, x_offset_chars);
-      int max_end = visible_start + remaining_chars;
-      int visible_end =
-          std::min({frag_end, static_cast<int>(text.size()), max_end});
-      int visible_len = visible_end - visible_start;
-
-      if (visible_len <= 0)
-        break;  // No more visible chars in this line, stop rendering
-
-      float x = left + advance * (visible_start - x_offset_chars);
-
-      renderer.Text(&text[visible_start], visible_len, font_size, x, y,
-                    it->color, it->underline_color, it->background_color, 1.0f);
-
-      remaining_chars -= visible_len;
-    }
-
-    y += line_height;
-  }
 }
 
 }  // namespace MTerm

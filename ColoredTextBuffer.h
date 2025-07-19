@@ -4,27 +4,29 @@
 #include <deque>
 #include <vector>
 
-struct Fragment {
+struct LineFragment {
   int pos;
   int color;
   int underline_color;
   int background_color;
 };
 
-struct Line {
+struct ColoredLine {
   std::vector<char32_t> text;
-  std::vector<Fragment> fragments;
+  std::vector<LineFragment> fragments;
 };
 
 namespace MTerm {
 
-class Renderer;
+class Window;
 
 class ColoredTextBuffer {
  public:
   ColoredTextBuffer();
 
   void AddLine();
+
+  std::deque<ColoredLine>& GetLines();
 
   void WriteToLine(size_t line_index, const char32_t* text, int length);
 
@@ -40,25 +42,16 @@ class ColoredTextBuffer {
                 int underline_color,
                 int background_color);
 
-  void Render(Renderer& renderer,
-              float left,
-              float top,
-              float width,
-              float height,
-              int x_offset_chars,
-              int y_offset_lines,
-              float font_size);
-
  private:
-  static void ReplaceSubrange(std::vector<Fragment>& fragments,
+  static void ReplaceSubrange(std::vector<LineFragment>& fragments,
                               size_t start,
                               size_t end,
-                              const Fragment* replacement_ptr,
+                              const LineFragment* replacement_ptr,
                               size_t replacement_size);
 
-  static void MaybeAddFragment(Fragment* fragments, int& size, Fragment fragment);
+  static void MaybeAddFragment(LineFragment* fragments, int& size, LineFragment fragment);
 
-  std::deque<Line> m_lines;
+  std::deque<ColoredLine> m_lines;
 };
 
 }  // namespace MTerm

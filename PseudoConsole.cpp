@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "defaults.h"
-
 namespace MTerm {
 
 class PseudoConsole::Impl {
@@ -29,7 +27,7 @@ class PseudoConsole::Impl {
     std::function<void(const char*, DWORD)> onData;
   };
 
-  std::unique_ptr<PtyReadBuffer> m_readBuffer;
+  std::unique_ptr<PtyReadBuffer> m_readBuffer = nullptr;
 
   short m_numRows = 24;
   short m_numColumns = 80;
@@ -123,10 +121,10 @@ class PseudoConsole::Impl {
 
   void Close() {
     if (m_readBuffer) {
-      if (m_readBuffer->io)
+      /*if (m_readBuffer->io)
         CloseThreadpoolIo(m_readBuffer->io);
       if (m_readBuffer->timer)
-        CloseThreadpoolTimer(m_readBuffer->timer);
+        CloseThreadpoolTimer(m_readBuffer->timer);*/
     }
     if (m_hInput != INVALID_HANDLE_VALUE)
       CloseHandle(m_hInput);
@@ -205,7 +203,14 @@ class PseudoConsole::Impl {
 
 PseudoConsole::PseudoConsole() : m_impl(std::make_unique<Impl>()) {}
 
-PseudoConsole::~PseudoConsole() {}
+PseudoConsole::~PseudoConsole() {
+}
+
+// Перемещающий конструктор
+PseudoConsole::PseudoConsole(PseudoConsole&&) noexcept = default;
+
+// Перемещающий оператор присваивания
+PseudoConsole& PseudoConsole::operator=(PseudoConsole&&) noexcept = default;
 
 bool PseudoConsole::Start(
     short num_rows,

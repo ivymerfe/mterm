@@ -4,11 +4,20 @@
 #include <memory>
 
 namespace MTerm {
+constexpr auto PTY_BUFFER_SIZE = 16384;
 
 class PseudoConsole {
  public:
   PseudoConsole();
   ~PseudoConsole();
+
+  // Разрешаем перемещение
+  PseudoConsole(PseudoConsole&&) noexcept;
+  PseudoConsole& operator=(PseudoConsole&&) noexcept;
+
+  // Запрещаем копирование
+  PseudoConsole(const PseudoConsole&) = delete;
+  PseudoConsole& operator=(const PseudoConsole&) = delete;
 
   bool Start(short num_rows,
              short num_columns,
