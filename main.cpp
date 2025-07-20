@@ -16,6 +16,10 @@ static void OnInput(char32_t codepoint)
   OutputDebugString(L"User input\n");
 }
 
+static void OnMouseDown(int button, int x, int y) {
+  OutputDebugString(L"Mouse down\n");
+}
+
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
                    LPSTR pCmdLine,
@@ -32,9 +36,11 @@ int WINAPI WinMain(HINSTANCE hInstance,
   config.close_button_offset = 30;
   config.max_button_offset = 0;
   config.min_button_offset = 90;
+  config.cursor_id = 0;
 
   config.render_callback = OnRender;
   config.input_callback = OnInput;
+  config.mousedown_callback = OnMouseDown;
 
   return window.Create(config);
 }

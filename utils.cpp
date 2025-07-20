@@ -5,8 +5,9 @@
 
 namespace MTerm {
 
-std::vector<char32_t> Utils::Utf8ToUtf32(const char* utf8, size_t size) {
-  std::vector<char32_t> utf32;
+void Utils::Utf8ToUtf32(const char* utf8,
+                        size_t size,
+                        std::vector<char32_t>& utf32) {
   size_t i = 0;
 
   while (i < size) {
@@ -43,13 +44,13 @@ std::vector<char32_t> Utils::Utf8ToUtf32(const char* utf8, size_t size) {
 
     utf32.push_back(static_cast<char32_t>(codepoint));
   }
-
-  return utf32;
 }
 
-std::vector<char> Utils::Utf32ToUtf8(const std::vector<char32_t>& utf32) {
-  std::vector<char> utf8;
-  for (char32_t codepoint : utf32) {
+void Utils::Utf32ToUtf8(const char32_t* utf32,
+                        size_t length,
+                        std::vector<char>& utf8) {
+  for (int i = 0; i < length; i++) {
+    char32_t codepoint = utf32[i];
     if (codepoint <= 0x7F) {
       // 1-byte sequence
       utf8.push_back(static_cast<char>(codepoint));
@@ -72,7 +73,6 @@ std::vector<char> Utils::Utf32ToUtf8(const std::vector<char32_t>& utf32) {
       throw std::runtime_error("Invalid UTF-32 codepoint");
     }
   }
-  return utf8;
 }
 
 void Utils::Utf32CharToUtf8(char32_t codepoint, char out[4], int& out_len) {
@@ -97,67 +97,6 @@ void Utils::Utf32CharToUtf8(char32_t codepoint, char out[4], int& out_len) {
   } else {
     out_len = 0;
   }
-}
-
-std::vector<std::vector<char32_t>> Utils::SplitByLines(
-    const std::vector<char32_t>& input) {
-  std::vector<std::vector<char32_t>> lines;
-  std::vector<char32_t> current_line;
-
-  size_t i = 0;
-  while (i < input.size()) {
-    char32_t c = input[i];
-
-    if (c == U'\r') {  // Carriage Return
-      if (i + 1 < input.size() && input[i + 1] == U'\n') {
-        // Windows-style CRLF
-        ++i;
-      }
-      lines.push_back(current_line);
-      current_line.clear();
-    } else if (c == U'\n') {  // Line Feed
-      lines.push_back(current_line);
-      current_line.clear();
-    } else {
-      current_line.push_back(c);
-    }
-
-    ++i;
-  }
-
-  // Add the last line if it's non-empty or if input ends with a newline
-  if (!current_line.empty() ||
-      (!input.empty() && (input.back() == U'\n' || input.back() == U'\r'))) {
-    lines.push_back(current_line);
-  }
-
-  return lines;
-}
-
-std::optional<std::string> Utils::GetFileContent(const char* filename) {
-  HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
-                             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-  if (hFile == INVALID_HANDLE_VALUE) {
-    return std::nullopt;
-  }
-
-  DWORD fileSize = GetFileSize(hFile, NULL);
-  if (fileSize == INVALID_FILE_SIZE || fileSize == 0) {
-    CloseHandle(hFile);
-    return std::nullopt;
-  }
-
-  std::string content(fileSize, '\0');
-  DWORD bytesRead = 0;
-  BOOL success = ReadFile(hFile, &content[0], fileSize, &bytesRead, NULL);
-  CloseHandle(hFile);
-
-  if (!success || bytesRead != fileSize) {
-    return std::nullopt;
-  }
-
-  return content;
 }
 
 }  // namespace MTerm

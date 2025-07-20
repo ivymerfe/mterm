@@ -13,8 +13,8 @@
 #include <condition_variable>
 #include <functional>
 #include <mutex>
-#include <unordered_map>
 #include <thread>
+#include <unordered_map>
 
 #include "ColoredTextBuffer.h"
 
@@ -34,9 +34,21 @@ struct Config {
   int close_button_offset;
   int max_button_offset;
   int min_button_offset;
+  int cursor_id;
 
   std::function<void()> render_callback;
-  std::function<void(char32_t)> input_callback;
+  std::function<void(int width, int height)> resize_callback;
+  std::function<
+      void(int keycode, bool control_down, bool shift_down, bool alt_down)>
+      keydown_callback;
+  std::function<
+      void(int keycode, bool control_down, bool shift_down, bool alt_down)>
+      keyup_callback;
+  std::function<void(char32_t chr)> input_callback;
+  std::function<void(int x, int y)> mousemove_callback;
+  std::function<void(int button, int x, int y)> mousedown_callback;
+  std::function<void(int button, int x, int y)> mouseup_callback;
+  std::function<void(int delta, int x, int y)> scroll_callback;
 };
 
 class Window {
@@ -47,7 +59,7 @@ class Window {
   int Create(Config config);
   void Destroy();
 
-  void InitRenderer();
+  void SetCursor(int cursor_id);
 
   void Redraw();
 
@@ -110,6 +122,8 @@ class Window {
                                      UINT uMsg,
                                      WPARAM wParam,
                                      LPARAM lParam);
+  void InitRenderer();
+  void StopRenderer();
   void RenderThread();
   void Render();
   UINT16 GetGlyphIndex(char32_t codepoint);
@@ -119,6 +133,7 @@ class Window {
 
   bool m_isInitialized = false;
   HWND m_hWindow;
+  HCURSOR m_hCursor;
 
   D2D1_SIZE_U m_windowSize;
   Microsoft::WRL::ComPtr<ID2D1Factory> m_d2dFactory;

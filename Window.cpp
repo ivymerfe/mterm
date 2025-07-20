@@ -3,10 +3,10 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include <shlobj.h>
+
 #undef min
 #undef max
-
-#include "resource.h"
 
 using namespace Microsoft::WRL;
 
@@ -32,13 +32,22 @@ int Window::Create(Config config) {
   windowClass.lpfnWndProc = Window::WindowProc;
   windowClass.hInstance = hInstance;
   windowClass.lpszClassName = CLASS_NAME;
-  windowClass.hCursor = LoadCursor(NULL, IDC_IBEAM);
+
+  if (config.cursor_id == 0) {
+    config.cursor_id = 32512;
+  }
+
+  m_hCursor = LoadCursor(NULL, MAKEINTRESOURCE(config.cursor_id));
+  windowClass.hCursor = m_hCursor;
   windowClass.hbrBackground = 0;
-  windowClass.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON),
-                                       IMAGE_ICON, 128, 128, LR_DEFAULTCOLOR);
-  windowClass.hIconSm =
-      (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON, 64,
-                       64, LR_DEFAULTCOLOR);
+
+  HICON hIcon = (HICON)LoadImage(NULL, L"icon.ico", IMAGE_ICON, 128, 128,
+                                 LR_LOADFROMFILE);
+  HICON hIconSm =
+      (HICON)LoadImage(NULL, L"icon.ico", IMAGE_ICON, 64, 64, LR_LOADFROMFILE);
+
+  windowClass.hIcon = hIcon;
+  windowClass.hIconSm = hIconSm;
 
   RegisterClassEx(&windowClass);
 
@@ -72,20 +81,35 @@ int Window::Create(Config config) {
       this        // Additional application data
   );
   if (m_hWindow == NULL) {
-    return false;
+    return 2;
+  }
+  SetCurrentProcessExplicitAppUserModelID(L"MTerm.Terminal.App.1.0");
+  if (hIcon) {
+    SendMessage(m_hWindow, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+  }
+  if (hIconSm) {
+    SendMessage(m_hWindow, WM_SETICON, ICON_SMALL, (LPARAM)hIconSm);
   }
   ShowWindow(m_hWindow, SW_SHOWDEFAULT);
   std::thread init_thread([this]() { this->InitRenderer(); });
   init_thread.detach();
 
   MSG msg = {};
+  int exit_code = 0;
   while (GetMessage(&msg, NULL, 0, 0) > 0) {
+    if (msg.message == WM_QUIT) {
+      exit_code = static_cast<int>(msg.wParam);
+      break;
+    }
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
-  init_thread.join();
-  Destroy();
-  return true;
+  StopRenderer();
+  return exit_code;
+}
+
+void Window::Destroy() {
+  DestroyWindow(m_hWindow);
 }
 
 void Window::InitRenderer() {
@@ -125,7 +149,7 @@ void Window::InitRenderer() {
   Redraw();
 }
 
-void Window::Destroy() {
+void Window::StopRenderer() {
   m_stopRendering.store(true);
   m_renderCv.notify_one();
   m_renderThread.join();
@@ -158,6 +182,19 @@ LRESULT CALLBACK Window::WindowProc(HWND hWnd,
     case WM_NCCALCSIZE: {
       if (wParam == TRUE) {
         return 0;
+      }
+      break;
+    }
+    case WM_GETICON: {
+      // Возвращаем нашу иконку когда система запрашивает её
+      if (wParam == ICON_BIG) {
+        HICON hIcon = (HICON)GetClassLongPtr(hWnd, GCLP_HICON);
+        if (hIcon)
+          return (LRESULT)hIcon;
+      } else if (wParam == ICON_SMALL) {
+        HICON hIconSm = (HICON)GetClassLongPtr(hWnd, GCLP_HICONSM);
+        if (hIconSm)
+          return (LRESULT)hIconSm;
       }
       break;
     }
@@ -220,7 +257,6 @@ LRESULT CALLBACK Window::WindowProc(HWND hWnd,
     }
     case WM_NCPAINT:
     case WM_SETTEXT:
-    case WM_SETICON:
       return 0;  // Block all default non-client painting
     case WM_NCACTIVATE: {
       // Tell Windows to not redraw the non-client area (title bar)
@@ -313,18 +349,140 @@ LRESULT CALLBACK Window::WindowProc(HWND hWnd,
 
           Window* window =
               reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-          window->m_config.input_callback(codepoint);
+
+          if (window->m_config.input_callback) {
+            window->m_config.input_callback(codepoint);
+          }
         } else {
           // Unexpected low surrogate — error or ignore
         }
       } else {
         char32_t codepoint = ch;
         pending_high_surrogate = 0;
+        Window* window =
+            reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+        if (window->m_config.input_callback) {
+          window->m_config.input_callback(codepoint);
+        }
+      }
+      return 0;
+    }
+    case WM_SYSKEYDOWN:
+    case WM_KEYDOWN: {
+      Window* window =
+          reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+      if (window->m_config.keydown_callback) {
+        int keycode = wParam;
+        bool control_down = GetAsyncKeyState(VK_CONTROL) & 0x8000;
+        bool shift_down = GetAsyncKeyState(VK_SHIFT) & 0x8000;
+        bool alt_down =
+            uMsg == WM_SYSKEYDOWN || GetAsyncKeyState(VK_MENU) & 0x8000;
+        window->m_config.keydown_callback(keycode, control_down, shift_down,
+                                          alt_down);
+      }
+      return 0;
+    }
+    case WM_SYSKEYUP:
+    case WM_KEYUP: {
+      Window* window =
+          reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+      if (window->m_config.keyup_callback) {
+        int keycode = wParam;
+        bool control_down = GetAsyncKeyState(VK_CONTROL) & 0x8000;
+        bool shift_down = GetAsyncKeyState(VK_SHIFT) & 0x8000;
+        bool alt_down =
+            uMsg == WM_SYSKEYUP || GetAsyncKeyState(VK_MENU) & 0x8000;
+        window->m_config.keyup_callback(keycode, control_down, shift_down,
+                                        alt_down);
+      }
+      return 0;
+    }
+    case WM_MOUSEMOVE: {
+      Window* window =
+          reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+      if (window && window->m_config.mousemove_callback) {
+        int x = GET_X_LPARAM(lParam);
+        int y = GET_Y_LPARAM(lParam);
+        window->m_config.mousemove_callback(x, y);
+      }
+      return 0;
+    }
+    case WM_SETCURSOR:
+    {
+      Window* window =
+          reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+      ::SetCursor(window->m_hCursor);
+      return TRUE;
+    }
+    case WM_LBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+    case WM_XBUTTONDOWN: {
+      Window* window =
+          reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+      if (window && window->m_config.mousedown_callback) {
+        int button;
+        if (uMsg == WM_LBUTTONDOWN)
+          button = 0;
+        else if (uMsg == WM_MBUTTONDOWN)
+          button = 1;
+        else if (uMsg == WM_RBUTTONDOWN)
+          button = 2;
+        else if (uMsg == WM_XBUTTONDOWN) {
+          // LOWORD(wParam) gives which X button (1 = XBUTTON1, 2 = XBUTTON2)
+          button = 3 + GET_XBUTTON_WPARAM(wParam) - 1;
+        } else
+          button = -1;
+        int x = GET_X_LPARAM(lParam);
+        int y = GET_Y_LPARAM(lParam);
+        window->m_config.mousedown_callback(button, x, y);
+      }
+      return 0;
+    }
+    case WM_LBUTTONUP:
+    case WM_MBUTTONUP:
+    case WM_RBUTTONUP:
+    case WM_XBUTTONUP: {
+      Window* window =
+          reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+      if (window && window->m_config.mouseup_callback) {
+        int button;
+        if (uMsg == WM_LBUTTONUP)
+          button = 0;
+        else if (uMsg == WM_MBUTTONUP)
+          button = 1;
+        else if (uMsg == WM_RBUTTONUP)
+          button = 2;
+        else if (uMsg == WM_XBUTTONUP) {
+          button = 3 + GET_XBUTTON_WPARAM(wParam) - 1;
+        } else
+          button = -1;
+        int x = GET_X_LPARAM(lParam);
+        int y = GET_Y_LPARAM(lParam);
+        window->m_config.mouseup_callback(button, x, y);
+      }
+      return 0;
+    }
+    case WM_MOUSEWHEEL: {
+      Window* window =
+          reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+      if (window && window->m_config.scroll_callback) {
+        int delta = GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;
+        int x = GET_X_LPARAM(lParam);
+        int y = GET_Y_LPARAM(lParam);
+        window->m_config.scroll_callback(delta, x, y);
       }
       return 0;
     }
   }
   return DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
+
+void Window::SetCursor(int cursor_id) {
+  m_hCursor = LoadCursor(NULL, MAKEINTRESOURCE(cursor_id));
 }
 
 void Window::Redraw() {
@@ -374,6 +532,9 @@ void Window::Resize(unsigned int width, unsigned int height) {
   }
   if (m_windowSize.width == width && m_windowSize.height == height) {
     return;
+  }
+  if (m_config.resize_callback) {
+    m_config.resize_callback(width, height);
   }
   std::unique_lock lock(m_resizeMutex);
 

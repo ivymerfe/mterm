@@ -7,11 +7,29 @@ if (POLICY CMP0141)
 endif()
 
 project ("mterm")
+add_subdirectory (pybind11)
 
 add_compile_definitions(UNICODE _UNICODE)
 
-add_executable (mterm WIN32 "main.cpp" "resource.rc"    "Utils.h" "Utils.cpp" "PseudoConsole.h" "PseudoConsole.cpp" "Window.h" "Window.cpp" "ColoredTextBuffer.h" "ColoredTextBuffer.cpp")
+pybind11_add_module(mterm 
+    "bindings.cpp"
+    "Utils.h" 
+    "Utils.cpp" 
+    "PseudoConsole.h" 
+    "PseudoConsole.cpp" 
+    "Window.h" 
+    "Window.cpp" 
+    "ColoredTextBuffer.h" 
+    "ColoredTextBuffer.cpp"
+)
 
-target_link_libraries (mterm PRIVATE dxguid.lib d2d1.lib dwrite.lib)
+target_link_libraries(mterm PRIVATE dxguid.lib d2d1.lib dwrite.lib shell32.lib)
 
 set_property(TARGET mterm PROPERTY CXX_STANDARD 20)
+
+# Опциональные компилятор-специфичные флаги для оптимизации
+if(MSVC)
+    target_compile_options(mterm PRIVATE /O2)
+else()
+    target_compile_options(mterm PRIVATE -O3)
+endif()
