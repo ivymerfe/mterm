@@ -11,14 +11,6 @@ class PseudoConsole {
   PseudoConsole();
   ~PseudoConsole();
 
-  // Разрешаем перемещение
-  PseudoConsole(PseudoConsole&&) noexcept;
-  PseudoConsole& operator=(PseudoConsole&&) noexcept;
-
-  // Запрещаем копирование
-  PseudoConsole(const PseudoConsole&) = delete;
-  PseudoConsole& operator=(const PseudoConsole&) = delete;
-
   bool Start(short num_rows,
              short num_columns,
              std::function<void(const char*, unsigned int)> on_data_callback);

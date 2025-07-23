@@ -206,12 +206,6 @@ PseudoConsole::PseudoConsole() : m_impl(std::make_unique<Impl>()) {}
 PseudoConsole::~PseudoConsole() {
 }
 
-// Перемещающий конструктор
-PseudoConsole::PseudoConsole(PseudoConsole&&) noexcept = default;
-
-// Перемещающий оператор присваивания
-PseudoConsole& PseudoConsole::operator=(PseudoConsole&&) noexcept = default;
-
 bool PseudoConsole::Start(
     short num_rows,
     short num_columns,

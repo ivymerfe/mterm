@@ -1,20 +1,8 @@
 #pragma once
 
-#define WIN32_LEAN_AND_MEAN
-#include "Windows.h"
-
-#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
-#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
-
-#include <d2d1.h>
-#include <dwrite.h>
-#include <wrl/client.h>
-
-#include <condition_variable>
 #include <functional>
-#include <mutex>
-#include <thread>
-#include <unordered_map>
+#include <memory>
+#include <string>
 
 #include "ColoredTextBuffer.h"
 
@@ -23,7 +11,7 @@ namespace MTerm {
 constexpr auto TEXT_BUFFER_SIZE = 1024 * 1024;
 
 struct Config {
-  const wchar_t* font_name;
+  std::wstring font_name;
   int window_width;
   int window_height;
   int window_min_width;
@@ -66,8 +54,6 @@ class Window {
   void Resize(unsigned int width, unsigned int height);
   int GetWidth() const;
   int GetHeight() const;
-
-  void Input(char32_t codepoint);
 
   void Clear(int color);
 
@@ -118,49 +104,8 @@ class Window {
   float GetLineHeight(float font_size) const;
 
  private:
-  static LRESULT CALLBACK WindowProc(HWND hWnd,
-                                     UINT uMsg,
-                                     WPARAM wParam,
-                                     LPARAM lParam);
-  void InitRenderer();
-  void StopRenderer();
-  void RenderThread();
-  void Render();
-  UINT16 GetGlyphIndex(char32_t codepoint);
-  void LoadFont(const wchar_t* font_name);
-
-  Config m_config;
-
-  bool m_isInitialized = false;
-  HWND m_hWindow;
-  HCURSOR m_hCursor;
-
-  D2D1_SIZE_U m_windowSize;
-  Microsoft::WRL::ComPtr<ID2D1Factory> m_d2dFactory;
-  Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> m_renderTarget;
-  Microsoft::WRL::ComPtr<IDWriteFactory> m_dwriteFactory;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_defaultBrush;
-
-  Microsoft::WRL::ComPtr<IDWriteFontFace> m_fontFace;
-  float m_advanceEm;
-  float m_lineHeightEm;
-  float m_baselineEm;
-  float m_underlinePosEm;
-  float m_underlineThicknessEm;
-  std::unordered_map<char32_t, unsigned short> m_glyphIndexCache;
-  std::vector<unsigned short> m_wcharIndexesVector;
-
-  std::vector<unsigned short> m_textBuffer;
-  unsigned int m_textBufferPos = 0;
-
-  std::atomic<long long> m_contentVersion = 0;
-  std::atomic<long long> m_renderedVersion = 0;
-  std::atomic<bool> m_stopRendering = false;
-  std::thread m_renderThread;
-  std::mutex m_renderMutex;
-  std::condition_variable m_renderCv;
-  std::atomic<bool> m_windowResized = false;
-  std::mutex m_resizeMutex;
+  class Impl;
+  std::unique_ptr<Impl> m_impl;
 };
 
 }  // namespace MTerm

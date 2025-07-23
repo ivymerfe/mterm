@@ -45,29 +45,10 @@ PYBIND11_MODULE(mterm, m) {
       .def_property(
           "font_name",
           [](const MTerm::Config& self) -> std::string {
-            if (self.font_name) {
-              // wchar_t* -> UTF-8 для чтения
-              int utf8_size = WideCharToMultiByte(
-                  CP_UTF8, 0, self.font_name, -1, nullptr, 0, nullptr, nullptr);
-              if (utf8_size > 0) {
-                std::vector<char> utf8(utf8_size);
-                WideCharToMultiByte(CP_UTF8, 0, self.font_name, -1, utf8.data(),
-                                    utf8_size, nullptr, nullptr);
-                return std::string(utf8.data());
-              }
-            }
-            return "";
+            return MTerm::Utils::WCharToUtf8(self.font_name);
           },
           [](MTerm::Config& self, const std::string& utf8_str) {
-            // UTF-8 -> wchar_t* для записи
-            int wide_size = MultiByteToWideChar(CP_UTF8, 0, utf8_str.c_str(),
-                                                -1, nullptr, 0);
-            if (wide_size > 0) {
-              static std::vector<wchar_t> wide_buffer(wide_size);
-              MultiByteToWideChar(CP_UTF8, 0, utf8_str.c_str(), -1,
-                                  wide_buffer.data(), wide_size);
-              self.font_name = wide_buffer.data();
-            }
+            self.font_name = MTerm::Utils::Utf8ToWChar(utf8_str);
           })
       .def_readwrite("window_width", &MTerm::Config::window_width)
       .def_readwrite("window_height", &MTerm::Config::window_height)
@@ -319,10 +300,10 @@ PYBIND11_MODULE(mterm, m) {
           [](MTerm::Window& self, const std::string& utf8_text, float font_size,
              float x, float y, int color, int underline_color,
              int background_color, float opacity) {
-            py::gil_scoped_release release;
             std::vector<char32_t> utf32;
             MTerm::Utils::Utf8ToUtf32(utf8_text.c_str(), utf8_text.size(),
                                       utf32);
+            py::gil_scoped_release release;
             self.Text(utf32.data(), static_cast<int>(utf32.size()), font_size,
                       x, y, color, underline_color, background_color, opacity);
           },
