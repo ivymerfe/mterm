@@ -1,13 +1,9 @@
-import mterm
-import cursors
+from . import mterm, cursors
 
 
 class Window(mterm.Window):
     def on_render(self):
-        self.clear(0xff0000)
-        self.line(100, 100, 200, 200, 1, 0x00ff00)
-        self.rect(300, 300, 500, 500, 0x0000ff)
-        self.text("Hello!!!", 32.0, 100.0, 100.0, 0x00ff00, -1, -1, 1.0)
+        pass
 
     def on_resize(self, width, height):
         pass
@@ -18,9 +14,8 @@ class Window(mterm.Window):
     def on_keyup(self, key, ctrl_down, shift_down, alt_down):
         pass
 
-    def on_input(self, chr):
-        print(chr, end='')
-        self.destroy()
+    def on_input(self, char):
+        pass
 
     def on_mousemove(self, x, y):
         pass
@@ -62,7 +57,3 @@ class Window(mterm.Window):
         config.scroll_callback = self.on_scroll
 
         return self.create(config)
-
-
-window = Window()
-exit(window.run())
