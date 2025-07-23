@@ -781,8 +781,11 @@ class Window::Impl {
         return 0;
       }
       case WM_SETCURSOR: {
-        ::SetCursor(window->m_hCursor);
-        return TRUE;
+        if (LOWORD(lParam) == HTCLIENT) {
+          ::SetCursor(window->m_hCursor);
+          return TRUE;
+        }
+        break;
       }
       case WM_LBUTTONDOWN:
       case WM_MBUTTONDOWN:
