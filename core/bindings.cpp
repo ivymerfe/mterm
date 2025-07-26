@@ -7,6 +7,8 @@
 #include "Utils.h"
 #include "Window.h"
 
+#include "Windows.h"
+
 namespace py = pybind11;
 
 PYBIND11_MODULE(mterm, m) {
@@ -53,12 +55,7 @@ PYBIND11_MODULE(mterm, m) {
       .def_readwrite("window_height", &MTerm::Config::window_height)
       .def_readwrite("window_min_width", &MTerm::Config::window_min_width)
       .def_readwrite("window_min_height", &MTerm::Config::window_min_height)
-      .def_readwrite("caption_size", &MTerm::Config::caption_size)
       .def_readwrite("border_size", &MTerm::Config::border_size)
-      .def_readwrite("button_size", &MTerm::Config::button_size)
-      .def_readwrite("close_button_offset", &MTerm::Config::close_button_offset)
-      .def_readwrite("max_button_offset", &MTerm::Config::max_button_offset)
-      .def_readwrite("min_button_offset", &MTerm::Config::min_button_offset)
       .def_readwrite("cursor_id", &MTerm::Config::cursor_id)
       .def_readwrite("render_callback", &MTerm::Config::render_callback)
       .def_readwrite("resize_callback", &MTerm::Config::resize_callback)
@@ -86,7 +83,11 @@ PYBIND11_MODULE(mterm, m) {
       .def_readwrite("mousemove_callback", &MTerm::Config::mousemove_callback)
       .def_readwrite("mousedown_callback", &MTerm::Config::mousedown_callback)
       .def_readwrite("mouseup_callback", &MTerm::Config::mouseup_callback)
-      .def_readwrite("scroll_callback", &MTerm::Config::scroll_callback);
+      .def_readwrite("doubleclick_callback",
+                     &MTerm::Config::doubleclick_callback)
+      .def_readwrite("scroll_callback", &MTerm::Config::scroll_callback)
+      .def_readwrite("mouse_leave_callback",
+                     &MTerm::Config::mouse_leave_callback);
 
   // Экспорт PseudoConsole с UTF-8 callback
   py::class_<MTerm::PseudoConsole>(m, "PseudoConsole")
@@ -195,20 +196,17 @@ PYBIND11_MODULE(mterm, m) {
 
             if (config.keydown_callback) {
               auto original_keydown = config.keydown_callback;
-              config.keydown_callback = [original_keydown](
-                                            int keycode, bool ctrl, bool shift,
-                                            bool alt) {
+              config.keydown_callback = [original_keydown](int keycode) {
                 py::gil_scoped_acquire acquire;
-                original_keydown(keycode, ctrl, shift, alt);
+                original_keydown(keycode);
               };
             }
 
             if (config.keyup_callback) {
               auto original_keyup = config.keyup_callback;
-              config.keyup_callback = [original_keyup](int keycode, bool ctrl,
-                                                       bool shift, bool alt) {
+              config.keyup_callback = [original_keyup](int keycode) {
                 py::gil_scoped_acquire acquire;
-                original_keyup(keycode, ctrl, shift, alt);
+                original_keyup(keycode);
               };
             }
 
@@ -240,12 +238,29 @@ PYBIND11_MODULE(mterm, m) {
               };
             }
 
+            if (config.doubleclick_callback) {
+              auto original_doubleclick = config.doubleclick_callback;
+              config.doubleclick_callback = [original_doubleclick](
+                                                int button, int x, int y) {
+                py::gil_scoped_acquire acquire;
+                original_doubleclick(button, x, y);
+              };
+            }
+
             if (config.scroll_callback) {
               auto original_scroll = config.scroll_callback;
               config.scroll_callback = [original_scroll](int delta, int x,
                                                          int y) {
                 py::gil_scoped_acquire acquire;
                 original_scroll(delta, x, y);
+              };
+            }
+
+            if (config.mouse_leave_callback) {
+              auto original_mouse_leave = config.mouse_leave_callback;
+              config.mouse_leave_callback = [original_mouse_leave]() {
+                py::gil_scoped_acquire acquire;
+                original_mouse_leave();
               };
             }
 
@@ -272,19 +287,42 @@ PYBIND11_MODULE(mterm, m) {
           },
           "Set cursor", py::arg("cursor_id"))
       .def(
+          "drag",
+          [](MTerm::Window& self) {
+            py::gil_scoped_release release;
+            self.Drag();
+          },
+          "Drag window")
+      .def(
+          "maximize",
+          [](MTerm::Window& self) {
+            py::gil_scoped_release release;
+            self.Maximize();
+          },
+          "Maximize window")
+      .def(
+          "minimize",
+          [](MTerm::Window& self) {
+            py::gil_scoped_release release;
+            self.Minimize();
+          },
+          "Minimize window")
+      .def(
+          "restore",
+          [](MTerm::Window& self) {
+            py::gil_scoped_release release;
+            self.Restore();
+          },
+          "Restore window")
+      .def("is_maximized", &MTerm::Window::IsMaximized,
+           "Check if window is maximized")
+      .def(
           "redraw",
           [](MTerm::Window& self) {
             py::gil_scoped_release release;
             self.Redraw();
           },
           "Redraw window")
-      .def(
-          "resize",
-          [](MTerm::Window& self, unsigned int width, unsigned int height) {
-            py::gil_scoped_release release;
-            self.Resize(width, height);
-          },
-          "Resize window", py::arg("width"), py::arg("height"))
       .def("get_width", &MTerm::Window::GetWidth, "Get window width")
       .def("get_height", &MTerm::Window::GetHeight, "Get window height")
       .def(
@@ -358,6 +396,57 @@ PYBIND11_MODULE(mterm, m) {
            py::arg("font_size"), py::arg("num_chars"))
       .def("get_line_height", &MTerm::Window::GetLineHeight, "Get line height",
            py::arg("font_size"));
+
+  m.def(
+      "is_key_down",
+      [](int vkey) { return (GetAsyncKeyState(vkey) & 0x8000) != 0; },
+      py::arg("vkey"), "Check if a virtual key is currently down");
+
+  m.def(
+      "clipboard_copy",
+      [](const std::string& utf8_text) {
+        if (!OpenClipboard(nullptr))
+          return false;
+        if (!EmptyClipboard()) {
+          CloseClipboard();
+          return false;
+        }
+        std::wstring wtext = MTerm::Utils::Utf8ToWChar(utf8_text);
+        size_t size = (wtext.size() + 1) * sizeof(wchar_t);
+        HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, size);
+        if (!hMem) {
+          CloseClipboard();
+          return false;
+        }
+        memcpy(GlobalLock(hMem), wtext.c_str(), size);
+        GlobalUnlock(hMem);
+        SetClipboardData(CF_UNICODETEXT, hMem);
+        CloseClipboard();
+        return true;
+      },
+      py::arg("text"), "Copy text to clipboard");
+
+  m.def(
+      "clipboard_paste",
+      []() -> std::string {
+        if (!OpenClipboard(nullptr))
+          return "";
+        HANDLE hData = GetClipboardData(CF_UNICODETEXT);
+        if (!hData) {
+          CloseClipboard();
+          return "";
+        }
+        wchar_t* wtext = static_cast<wchar_t*>(GlobalLock(hData));
+        if (!wtext) {
+          CloseClipboard();
+          return "";
+        }
+        std::wstring ws(wtext);
+        GlobalUnlock(hData);
+        CloseClipboard();
+        return MTerm::Utils::WCharToUtf8(ws);
+      },
+      "Paste text from clipboard");
 
   // Константы
   m.attr("PTY_BUFFER_SIZE") = MTerm::PTY_BUFFER_SIZE;

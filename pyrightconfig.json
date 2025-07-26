@@ -1,0 +1,8 @@
+{
+  "include": ["py"],
+  "executionEnvironments": [
+    {
+      "root": "py"
+    }
+  ]
+}

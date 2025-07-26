@@ -9,7 +9,7 @@ endif()
 project ("mterm")
 add_subdirectory (pybind11)
 
-add_compile_definitions(UNICODE _UNICODE)
+add_compile_definitions(UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 pybind11_add_module(mterm 
     "bindings.cpp"

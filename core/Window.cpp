@@ -1,6 +1,5 @@
 #include "Window.h"
 
-#define WIN32_LEAN_AND_MEAN
 #include "Windows.h"
 
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
@@ -16,9 +15,6 @@
 #include <mutex>
 #include <stdexcept>
 #include <thread>
-
-#undef min
-#undef max
 
 using namespace Microsoft::WRL;
 
@@ -75,6 +71,7 @@ class Window::Impl {
     windowClass.lpfnWndProc = WindowProc;
     windowClass.hInstance = hInstance;
     windowClass.lpszClassName = CLASS_NAME;
+    windowClass.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
 
     SetCursor(config.cursor_id);
     windowClass.hCursor = m_hCursor;
@@ -190,6 +187,41 @@ class Window::Impl {
         break;
     }
     m_hCursor = hCursor;
+  }
+
+  void Drag() {
+    if (!m_isInitialized) {
+      return;
+    }
+    SendMessage(m_hWindow, WM_SYSCOMMAND, SC_MOVE | HTCAPTION, 0);
+  }
+
+  void Maximize() {
+    if (!m_isInitialized) {
+      return;
+    }
+    ShowWindow(m_hWindow, SW_MAXIMIZE);
+  }
+
+  void Minimize() {
+    if (!m_isInitialized) {
+      return;
+    }
+    ShowWindow(m_hWindow, SW_MINIMIZE);
+  }
+
+  void Restore() {
+    if (!m_isInitialized) {
+      return;
+    }
+    ShowWindow(m_hWindow, SW_RESTORE);
+  }
+
+  bool IsMaximized() {
+    if (!m_isInitialized) {
+      return false;
+    }
+    return IsZoomed(m_hWindow) != 0;
   }
 
   void InitRenderer() {
@@ -542,13 +574,13 @@ class Window::Impl {
     m_advanceEm = (advanceWidth / designUnitsPerEm);
   }
 
+  wchar_t pending_high_surrogate = 0;
+  bool is_sizing = false;
+  bool is_tracking = false;
   static LRESULT CALLBACK WindowProc(HWND hWnd,
                                      UINT uMsg,
                                      WPARAM wParam,
                                      LPARAM lParam) {
-    static wchar_t pending_high_surrogate = 0;
-    static bool is_sizing = false;
-
     Impl* window =
         reinterpret_cast<Impl*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
@@ -620,27 +652,6 @@ class Window::Impl {
           if (right)
             return HTRIGHT;
         }
-
-        if (y < rect.top + config.caption_size) {
-          int button_size = config.button_size;
-
-          float close_button_mid = rect.right - config.close_button_offset;
-          if (x >= close_button_mid - button_size &&
-              x <= close_button_mid + button_size) {
-            return HTCLOSE;
-          }
-          float max_button_mid = rect.right - config.max_button_offset;
-          if (x >= max_button_mid - button_size &&
-              x <= max_button_mid + button_size) {
-            return HTMAXBUTTON;
-          }
-          float min_button_mid = rect.right - config.min_button_offset;
-          if (x >= min_button_mid - button_size &&
-              x <= min_button_mid + button_size) {
-            return HTMINBUTTON;
-          }
-          return HTCAPTION;
-        }
         return HTCLIENT;
       }
       case WM_NCPAINT:
@@ -649,29 +660,6 @@ class Window::Impl {
       case WM_NCACTIVATE: {
         // Tell Windows to not redraw the non-client area (title bar)
         return DefWindowProc(hWnd, uMsg, FALSE, -1);
-      }
-      case WM_NCLBUTTONDOWN: {
-        if (wParam == HTCLOSE || wParam == HTMAXBUTTON ||
-            wParam == HTMINBUTTON) {
-          return 0;
-        }
-        break;
-      }
-      case WM_NCLBUTTONUP: {
-        if (wParam == HTCLOSE) {
-          PostQuitMessage(0);
-        }
-        if (wParam == HTMAXBUTTON) {
-          if (IsZoomed(hWnd)) {
-            ShowWindow(hWnd, SW_RESTORE);
-          } else {
-            ShowWindow(hWnd, SW_MAXIMIZE);
-          }
-        }
-        if (wParam == HTMINBUTTON) {
-          ShowWindow(hWnd, SW_MINIMIZE);
-        }
-        break;
       }
       case WM_GETMINMAXINFO: {
         MINMAXINFO* pMinMax = (MINMAXINFO*)lParam;
@@ -699,7 +687,7 @@ class Window::Impl {
         return 0;
       }
       case WM_SIZE: {
-        is_sizing = true;
+        window->is_sizing = true;
         UINT width = LOWORD(lParam);
         UINT height = HIWORD(lParam);
         window->Resize(width, height);
@@ -710,10 +698,10 @@ class Window::Impl {
       }
       case WM_PAINT: {
         ValidateRect(hWnd, NULL);
-        if (!is_sizing) {
+        if (!window->is_sizing) {
           window->Redraw();
         }
-        is_sizing = false;
+        window->is_sizing = false;
         return 0;
       }
       case WM_CHAR: {
@@ -721,14 +709,15 @@ class Window::Impl {
 
         if (ch >= 0xD800 && ch <= 0xDBFF) {
           // High surrogate, store it
-          pending_high_surrogate = ch;
+          window->pending_high_surrogate = ch;
         } else if (ch >= 0xDC00 && ch <= 0xDFFF) {
           // Low surrogate
-          if (pending_high_surrogate != 0) {
+          if (window->pending_high_surrogate != 0) {
             // Combine into UTF-32
-            char32_t codepoint = ((pending_high_surrogate - 0xD800) << 10) +
-                                 (ch - 0xDC00) + 0x10000;
-            pending_high_surrogate = 0;
+            char32_t codepoint =
+                ((window->pending_high_surrogate - 0xD800) << 10) +
+                (ch - 0xDC00) + 0x10000;
+            window->pending_high_surrogate = 0;
 
             if (window->m_config.input_callback) {
               window->m_config.input_callback(codepoint);
@@ -738,7 +727,7 @@ class Window::Impl {
           }
         } else {
           char32_t codepoint = ch;
-          pending_high_surrogate = 0;
+          window->pending_high_surrogate = 0;
 
           if (window->m_config.input_callback) {
             window->m_config.input_callback(codepoint);
@@ -749,34 +738,33 @@ class Window::Impl {
       case WM_SYSKEYDOWN:
       case WM_KEYDOWN: {
         if (window->m_config.keydown_callback) {
-          int keycode = wParam;
-          bool control_down = GetAsyncKeyState(VK_CONTROL) & 0x8000;
-          bool shift_down = GetAsyncKeyState(VK_SHIFT) & 0x8000;
-          bool alt_down =
-              uMsg == WM_SYSKEYDOWN || GetAsyncKeyState(VK_MENU) & 0x8000;
-          window->m_config.keydown_callback(keycode, control_down, shift_down,
-                                            alt_down);
+          window->m_config.keydown_callback(wParam);
         }
         return 0;
       }
       case WM_SYSKEYUP:
       case WM_KEYUP: {
         if (window->m_config.keyup_callback) {
-          int keycode = wParam;
-          bool control_down = GetAsyncKeyState(VK_CONTROL) & 0x8000;
-          bool shift_down = GetAsyncKeyState(VK_SHIFT) & 0x8000;
-          bool alt_down =
-              uMsg == WM_SYSKEYUP || GetAsyncKeyState(VK_MENU) & 0x8000;
-          window->m_config.keyup_callback(keycode, control_down, shift_down,
-                                          alt_down);
+          window->m_config.keyup_callback(wParam);
         }
         return 0;
       }
       case WM_MOUSEMOVE: {
-        if (window && window->m_config.mousemove_callback) {
+        if (!window) {
+          return 0;
+        }
+        if (window->m_config.mousemove_callback) {
           int x = GET_X_LPARAM(lParam);
           int y = GET_Y_LPARAM(lParam);
           window->m_config.mousemove_callback(x, y);
+        }
+        if (window->m_config.mouse_leave_callback && !window->is_tracking) {
+          TRACKMOUSEEVENT tme = {};
+          tme.cbSize = sizeof(TRACKMOUSEEVENT);
+          tme.dwFlags = TME_LEAVE;
+          tme.hwndTrack = hWnd;
+          TrackMouseEvent(&tme);
+          window->is_tracking = true;
         }
         return 0;
       }
@@ -793,17 +781,18 @@ class Window::Impl {
       case WM_XBUTTONDOWN: {
         if (window && window->m_config.mousedown_callback) {
           int button;
-          if (uMsg == WM_LBUTTONDOWN)
+          if (uMsg == WM_LBUTTONDOWN) {
             button = 0;
-          else if (uMsg == WM_MBUTTONDOWN)
+          } else if (uMsg == WM_MBUTTONDOWN) {
             button = 1;
-          else if (uMsg == WM_RBUTTONDOWN)
+          } else if (uMsg == WM_RBUTTONDOWN) {
             button = 2;
-          else if (uMsg == WM_XBUTTONDOWN) {
+          } else if (uMsg == WM_XBUTTONDOWN) {
             // LOWORD(wParam) gives which X button (1 = XBUTTON1, 2 = XBUTTON2)
             button = 3 + GET_XBUTTON_WPARAM(wParam) - 1;
-          } else
+          } else {
             button = -1;
+          }
           int x = GET_X_LPARAM(lParam);
           int y = GET_Y_LPARAM(lParam);
           window->m_config.mousedown_callback(button, x, y);
@@ -816,19 +805,43 @@ class Window::Impl {
       case WM_XBUTTONUP: {
         if (window && window->m_config.mouseup_callback) {
           int button;
-          if (uMsg == WM_LBUTTONUP)
+          if (uMsg == WM_LBUTTONUP) {
             button = 0;
-          else if (uMsg == WM_MBUTTONUP)
+          } else if (uMsg == WM_MBUTTONUP) {
             button = 1;
-          else if (uMsg == WM_RBUTTONUP)
+          } else if (uMsg == WM_RBUTTONUP) {
             button = 2;
-          else if (uMsg == WM_XBUTTONUP) {
+          } else if (uMsg == WM_XBUTTONUP) {
             button = 3 + GET_XBUTTON_WPARAM(wParam) - 1;
-          } else
+          } else {
             button = -1;
+          }
           int x = GET_X_LPARAM(lParam);
           int y = GET_Y_LPARAM(lParam);
           window->m_config.mouseup_callback(button, x, y);
+        }
+        return 0;
+      }
+      case WM_LBUTTONDBLCLK:
+      case WM_MBUTTONDBLCLK:
+      case WM_RBUTTONDBLCLK:
+      case WM_XBUTTONDBLCLK: {
+        if (window && window->m_config.doubleclick_callback) {
+          int button;
+          if (uMsg == WM_LBUTTONDBLCLK) {
+            button = 0;
+          } else if (uMsg == WM_MBUTTONDBLCLK) {
+            button = 1;
+          } else if (uMsg == WM_RBUTTONDBLCLK) {
+            button = 2;
+          } else if (uMsg == WM_XBUTTONDBLCLK) {
+            button = 3 + GET_XBUTTON_WPARAM(wParam) - 1;
+          } else {
+            button = -1;
+          }
+          int x = GET_X_LPARAM(lParam);
+          int y = GET_Y_LPARAM(lParam);
+          window->m_config.doubleclick_callback(button, x, y);
         }
         return 0;
       }
@@ -838,6 +851,13 @@ class Window::Impl {
           int x = GET_X_LPARAM(lParam);
           int y = GET_Y_LPARAM(lParam);
           window->m_config.scroll_callback(delta, x, y);
+        }
+        return 0;
+      }
+      case WM_MOUSELEAVE: {
+        window->is_tracking = false;
+        if (window && window->m_config.mouse_leave_callback) {
+          window->m_config.mouse_leave_callback();
         }
         return 0;
       }
@@ -862,12 +882,28 @@ void Window::SetCursor(int cursor_id) {
   m_impl->SetCursor(cursor_id);
 }
 
-void Window::Redraw() {
-  m_impl->Redraw();
+void Window::Drag() {
+  m_impl->Drag();
 }
 
-void Window::Resize(unsigned int width, unsigned int height) {
-  m_impl->Resize(width, height);
+void Window::Maximize() {
+  m_impl->Maximize();
+}
+
+void Window::Minimize() {
+  m_impl->Minimize();
+}
+
+void Window::Restore() {
+  m_impl->Restore();
+}
+
+bool Window::IsMaximized() {
+  return m_impl->IsMaximized();
+}
+
+void Window::Redraw() {
+  m_impl->Redraw();
 }
 
 int Window::GetWidth() const {

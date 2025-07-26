@@ -1,9 +1,9 @@
 #include "PseudoConsole.h"
 
-#define WIN32_LEAN_AND_MEAN
+#include <cassert>
+
 #include "Windows.h"
 
-#include <assert.h>
 #include <exception>
 #include <memory>
 #include <string>

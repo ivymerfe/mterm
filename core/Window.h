@@ -16,27 +16,20 @@ struct Config {
   int window_height;
   int window_min_width;
   int window_min_height;
-  int caption_size;
   int border_size;
-  int button_size;
-  int close_button_offset;
-  int max_button_offset;
-  int min_button_offset;
   int cursor_id;
 
   std::function<void()> render_callback;
   std::function<void(int width, int height)> resize_callback;
-  std::function<
-      void(int keycode, bool control_down, bool shift_down, bool alt_down)>
-      keydown_callback;
-  std::function<
-      void(int keycode, bool control_down, bool shift_down, bool alt_down)>
-      keyup_callback;
+  std::function<void(int keycode)> keydown_callback;
+  std::function<void(int keycode)> keyup_callback;
   std::function<void(char32_t chr)> input_callback;
   std::function<void(int x, int y)> mousemove_callback;
   std::function<void(int button, int x, int y)> mousedown_callback;
   std::function<void(int button, int x, int y)> mouseup_callback;
+  std::function<void(int button, int x, int y)> doubleclick_callback;
   std::function<void(int delta, int x, int y)> scroll_callback;
+  std::function<void()> mouse_leave_callback;
 };
 
 class Window {
@@ -48,10 +41,14 @@ class Window {
   void Destroy();
 
   void SetCursor(int cursor_id);
+  void Drag();
+  void Maximize();
+  void Minimize();
+  void Restore();
+  bool IsMaximized();
 
   void Redraw();
 
-  void Resize(unsigned int width, unsigned int height);
   int GetWidth() const;
   int GetHeight() const;
 

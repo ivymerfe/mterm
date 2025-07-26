@@ -5,7 +5,7 @@
 
 namespace MTerm {
 
-static class Utils {
+class Utils {
  public:
   static void Utf8ToUtf32(const char* utf8,
                           size_t size,

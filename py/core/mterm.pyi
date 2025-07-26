@@ -3,11 +3,12 @@ from typing import Callable, Optional, List
 # Type aliases для удобства
 RenderCallback = Callable[[], None]
 ResizeCallback = Callable[[int, int], None]
-KeyCallback = Callable[[int, bool, bool, bool], None]
+KeyCallback = Callable[[int], None]
 InputCallback = Callable[[str], None]
 MouseMoveCallback = Callable[[int, int], None]
 MouseButtonCallback = Callable[[int, int, int], None]
 ScrollCallback = Callable[[int, int, int], None]
+MouseLeaveCallback = Callable[[], None]
 ConsoleDataCallback = Callable[[str], None]
 
 class LineFragment:
@@ -32,12 +33,7 @@ class Config:
     window_height: int
     window_min_width: int
     window_min_height: int
-    caption_size: int
     border_size: int
-    button_size: int
-    close_button_offset: int
-    max_button_offset: int
-    min_button_offset: int
     cursor_id: int
 
     render_callback: Optional[RenderCallback]
@@ -48,7 +44,9 @@ class Config:
     mousemove_callback: Optional[MouseMoveCallback]
     mousedown_callback: Optional[MouseButtonCallback]
     mouseup_callback: Optional[MouseButtonCallback]
+    doubleclick_callback: Optional[MouseButtonCallback]
     scroll_callback: Optional[ScrollCallback]
+    mouse_leave_callback: Optional[MouseLeaveCallback]
 
     def __init__(self) -> None: ...
 
@@ -96,9 +94,17 @@ class Window:
 
     def set_cursor(self, cursor_id: int) -> None: ...
 
-    def redraw(self) -> None: ...
+    def drag(self) -> None: ...
 
-    def resize(self, width: int, height: int) -> None: ...
+    def maximize(self) -> None: ...
+
+    def minimize(self) -> None: ...
+
+    def restore(self) -> None: ...
+
+    def is_maximized(self) -> bool: ...
+
+    def redraw(self) -> None: ...
 
     def get_width(self) -> int: ...
 
@@ -168,6 +174,12 @@ class Window:
 
     def get_line_height(self, font_size: float) -> float: ...
 
+
+def is_key_down(key: int) -> bool: ...
+
+def clipboard_copy(text: str) -> None: ...
+
+def clipboard_paste() -> str: ...
 
 # Константы
 PTY_BUFFER_SIZE: int

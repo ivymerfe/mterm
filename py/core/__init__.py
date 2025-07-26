@@ -1,5 +1,5 @@
 from .window import Window
-from .mterm import PseudoConsole, LineFragment, ColoredLine, ColoredTextBuffer
+from .mterm import PseudoConsole, LineFragment, ColoredLine, ColoredTextBuffer, is_key_down, clipboard_copy, clipboard_paste
 from . import keys, buttons, cursors
 
 __all__ = [
@@ -10,5 +10,8 @@ __all__ = [
     "ColoredTextBuffer",
     "keys",
     "buttons",
-    "cursors"
+    "cursors",
+    "is_key_down",
+    "clipboard_copy",
+    "clipboard_paste"
 ]

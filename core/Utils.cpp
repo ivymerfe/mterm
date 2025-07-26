@@ -1,5 +1,6 @@
 #include "Utils.h"
 
+#include <cstdint>
 #include <stdexcept>
 
 namespace MTerm {
