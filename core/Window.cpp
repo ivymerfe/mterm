@@ -347,10 +347,7 @@ class Window::Impl {
           "Text buffer overflow! Do you really want to draw so many "
           "characters?!");
     }
-
-    m_defaultBrush->SetColor(D2D1::ColorF(color));
     m_defaultBrush->SetOpacity(opacity);
-
     if (background_color != -1) {
       float width = GetLineWidth(font_size, length);
       float height = GetLineHeight(font_size);
@@ -358,30 +355,30 @@ class Window::Impl {
       m_renderTarget->FillRectangle({x, y, x + width, y + height},
                                     m_defaultBrush.Get());
     }
+    if (color != -1) {
+      int buffer_offset = m_textBufferPos;
+      for (int i = 0; i < length; i++) {
+        m_textBuffer[m_textBufferPos] = GetGlyphIndex(text[i]);
+        m_textBufferPos++;
+      }
 
-    int buffer_offset = m_textBufferPos;
-    for (int i = 0; i < length; i++) {
-      m_textBuffer[m_textBufferPos] = GetGlyphIndex(text[i]);
-      m_textBufferPos++;
+      float baseline_y = y + m_baselineEm * font_size;
+
+      DWRITE_GLYPH_RUN glyphRun = {};
+      glyphRun.fontFace = m_fontFace.Get();
+      glyphRun.fontEmSize = font_size;
+      glyphRun.glyphCount = length;
+      glyphRun.glyphIndices = m_textBuffer.data() + buffer_offset;
+      glyphRun.glyphAdvances = nullptr;  // use natural advance
+      glyphRun.isSideways = FALSE;
+      glyphRun.bidiLevel = 0;
+
+      m_defaultBrush->SetColor(D2D1::ColorF(color));
+
+      m_renderTarget->DrawGlyphRun(D2D1::Point2F(x, baseline_y), &glyphRun,
+                                   m_defaultBrush.Get(),
+                                   DWRITE_MEASURING_MODE_NATURAL);
     }
-
-    float baseline_y = y + m_baselineEm * font_size;
-
-    DWRITE_GLYPH_RUN glyphRun = {};
-    glyphRun.fontFace = m_fontFace.Get();
-    glyphRun.fontEmSize = font_size;
-    glyphRun.glyphCount = length;
-    glyphRun.glyphIndices = m_textBuffer.data() + buffer_offset;
-    glyphRun.glyphAdvances = nullptr;  // use natural advance
-    glyphRun.isSideways = FALSE;
-    glyphRun.bidiLevel = 0;
-
-    m_defaultBrush->SetColor(D2D1::ColorF(color));
-
-    m_renderTarget->DrawGlyphRun(D2D1::Point2F(x, baseline_y), &glyphRun,
-                                 m_defaultBrush.Get(),
-                                 DWRITE_MEASURING_MODE_NATURAL);
-
     if (underline_color != -1) {
       float underline_y = y + m_underlinePosEm * font_size;
       float width = GetLineWidth(font_size, length);

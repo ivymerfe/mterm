@@ -142,6 +142,13 @@ PYBIND11_MODULE(mterm, m) {
       .def("add_line", &MTerm::ColoredTextBuffer::AddLine, "Add new line")
       .def("get_lines", &MTerm::ColoredTextBuffer::GetLines,
            py::return_value_policy::reference_internal, "Get all lines")
+      .def("get_line_count", &MTerm::ColoredTextBuffer::GetLineCount,
+           "Get number of lines")
+      .def("insert_lines", &MTerm::ColoredTextBuffer::InsertLines,
+           "Insert lines at index", py::arg("index"), py::arg("count"))
+      .def("remove_lines", &MTerm::ColoredTextBuffer::RemoveLines,
+           "Remove lines in range", py::arg("start_index"),
+           py::arg("end_index"))
       .def(
           "write_to_line",
           [](MTerm::ColoredTextBuffer& self, size_t line_index,
@@ -153,6 +160,19 @@ PYBIND11_MODULE(mterm, m) {
                              static_cast<int>(utf32.size()));
           },
           "Write text to line", py::arg("line_index"), py::arg("text"))
+      .def("erase_in_line", &MTerm::ColoredTextBuffer::EraseInLine,
+           "Erase text in line", py::arg("line_index"), py::arg("start_pos"),
+           py::arg("end_pos"))
+      .def("get_line_length", &MTerm::ColoredTextBuffer::GetLineLength,
+           "Get length of line", py::arg("line_index"))
+      .def(
+          "get_line_text",
+          [](MTerm::ColoredTextBuffer& self, size_t line_index, int start_pos,
+             int end_pos) {
+            return self.GetLineText(line_index, start_pos, end_pos);
+          },
+          "Get text of line", py::arg("line_index"), py::arg("start_pos"),
+          py::arg("end_pos"))
       .def(
           "set_text",
           [](MTerm::ColoredTextBuffer& self, size_t line_index, int offset,
