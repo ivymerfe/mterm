@@ -37,6 +37,18 @@ void ColoredTextBuffer::RemoveLines(size_t start_index, size_t end_index) {
   m_lines.erase(it_start, it_end);
 }
 
+void ColoredTextBuffer::ResizeLines(size_t start_index,
+                                    size_t end_index,
+                                    size_t new_size) {
+  if (start_index >= m_lines.size() || end_index < start_index || new_size == 0) {
+    return;  // Invalid range or new size
+  }
+  end_index = std::min(end_index, m_lines.size() - 1);
+  for (size_t i = start_index; i <= end_index; i++) {
+    m_lines[i].text.resize(new_size, U' ');
+  }
+}
+
 void ColoredTextBuffer::WriteToLine(size_t line_index,
                                     const char32_t* text,
                                     int length) {
@@ -44,10 +56,6 @@ void ColoredTextBuffer::WriteToLine(size_t line_index,
     return;
   auto& line = m_lines[line_index];
   line.text.insert(line.text.end(), text, text + length);
-
-  if (line.fragments.empty()) {
-    line.fragments.push_back({0, 0, 0, 0});
-  }
 }
 
 void ColoredTextBuffer::EraseInLine(size_t line_index,
@@ -69,7 +77,7 @@ void ColoredTextBuffer::EraseInLine(size_t line_index,
   // Adjust fragments
   auto& fragments = line.fragments;
   if (fragments.empty()) {
-    fragments.push_back({0, 0, 0, 0});
+    return;
   }
   auto it_start = std::upper_bound(
       fragments.begin(), fragments.end(), start_pos,
@@ -104,7 +112,6 @@ std::string ColoredTextBuffer::GetLineText(size_t line_index,
   if (line_index >= m_lines.size()) {
     return std::string();  // Invalid line index
   }
-
   const auto& line = m_lines[line_index];
   int max_pos = static_cast<int>(line.text.size() - 1);
   start_pos = std::min(std::max(start_pos, 0), max_pos);
@@ -123,21 +130,33 @@ void ColoredTextBuffer::SetText(size_t line_index,
                                 int offset,
                                 const char32_t* content,
                                 int length) {
-  if (line_index >= m_lines.size() || offset < 0 || length <= 0 || !content)
+  if (line_index >= m_lines.size() || offset < 0 || length <= 0 || !content) {
     return;
-
+  }
   auto& line = m_lines[line_index];
   size_t required = static_cast<size_t>(offset + length);
   if (line.text.size() < required) {
     line.text.resize(required, U' ');
   }
-
   for (int i = 0; i < length; ++i) {
     line.text[offset + i] = content[i];
   }
+}
 
-  if (line.fragments.empty()) {
-    line.fragments.push_back({0, 0, 0, 0});
+void ColoredTextBuffer::SetSpaces(size_t line_index,
+                                  int start_pos,
+                                  int end_pos) {
+  if (line_index >= m_lines.size() || start_pos < 0 || end_pos < start_pos) {
+    return;
+  }
+  auto& line = m_lines[line_index];
+  int line_last_pos = static_cast<int>(line.text.size() - 1);
+  if (end_pos > line_last_pos) {
+    line.text.resize(end_pos + 1, U' ');
+    line_last_pos = end_pos;
+  }
+  for (int i = start_pos; i <= end_pos; ++i) {
+    line.text[i] = U' ';
   }
 }
 
@@ -196,7 +215,9 @@ void ColoredTextBuffer::SetColor(size_t line_index,
 
   auto& fragments = line.fragments;
   if (fragments.empty()) {
-    fragments.push_back({0, 0, 0, 0});
+    // fragments.push_back({0, 0, 0, 0});
+    fragments.push_back({0, color, underline_color, background_color});
+    return;  // No fragments to adjust, just add a new one
   }
 
   auto it_start = std::upper_bound(

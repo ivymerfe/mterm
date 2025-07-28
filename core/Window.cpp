@@ -350,7 +350,7 @@ class Window::Impl {
     m_defaultBrush->SetOpacity(opacity);
     if (background_color != -1) {
       float width = GetLineWidth(font_size, length);
-      float height = GetLineHeight(font_size);
+      float height = ceil(GetLineHeight(font_size));
       m_defaultBrush->SetColor(D2D1::ColorF(background_color));
       m_renderTarget->FillRectangle({x, y, x + width, y + height},
                                     m_defaultBrush.Get());
@@ -450,6 +450,10 @@ class Window::Impl {
       const auto& line = lines[i];
       const auto& text = line.text;
       const auto& fragments = line.fragments;
+      if (fragments.empty()) {
+        y += line_height;
+        continue;  // No fragments, skip this line
+      }
 
       // Binary search for first relevant fragment
       auto frag_less = [](const LineFragment& frag, int pos) {

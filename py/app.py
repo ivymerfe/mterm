@@ -1,5 +1,5 @@
 import core
-import theme
+import user.theme as theme
 
 from terminal import Terminal
 
@@ -12,21 +12,18 @@ class App(core.Window):
     BUTTON_CLOSE = 1
     BUTTON_MAXIMIZE = 2
     BUTTON_MINIMIZE = 3
-    BUTTON_SIZEBAR = 4
 
     def __init__(self):
         super().__init__()
         self.terminals = []
         self.next_terminal_id = 0
-        self.active_terminal_id = -1
+        self.active_terminal_idx = -1
 
-        self.terminal_selector_size = theme.Selector.BASE_WIDTH
         self.selector_width = 0
         self.terminal_width = 0
         
         self.selected_group = -1
         self.selected_button = -1
-        self.is_resizing_selector = False
 
         self.mouse_x = 0
         self.mouse_y = 0
@@ -38,29 +35,23 @@ class App(core.Window):
         return self.get_height() - theme.Window.CAPTION_SIZE - theme.Window.OUTLINE_THICKNESS
 
     def get_selector_width(self):
-        return int(self.get_client_width() * self.terminal_selector_size)
+        return theme.Selector.WIDTH
     
     def get_terminal_width(self):
         return self.get_client_width() - self.get_selector_width()
 
     def create_terminal(self):
         terminal = Terminal(self, f"T-{self.next_terminal_id}")
-        self.active_terminal_id = len(self.terminals)
+        self.active_terminal_idx = len(self.terminals)
         self.terminals.append(terminal)
         self.next_terminal_id += 1
     
     def destroy_terminal(self, terminal_id):
         if 0 <= terminal_id < len(self.terminals):
             del self.terminals[terminal_id]
-            if terminal_id <= self.active_terminal_id:
-                self.active_terminal_id -= 1
-                self.active_terminal_id = max(0, self.active_terminal_id)
-
-    def resize_active_terminal(self):
-        if 0 <= self.active_terminal_id < len(self.terminals):
-            terminal = self.terminals[self.active_terminal_id]
-            terminal.resize(self.get_terminal_width(), self.get_client_height())
-            self.redraw()
+            if terminal_id <= self.active_terminal_idx:
+                self.active_terminal_idx -= 1
+                self.active_terminal_idx = max(0, self.active_terminal_idx)
 
     def on_render(self):
         pass
@@ -74,9 +65,10 @@ class App(core.Window):
         height = self.get_client_height()
         terminal_x = x + self.selector_width
         self.render_terminal_selector(x, y, self.selector_width, height)
-        if 0 <= self.active_terminal_id < len(self.terminals):
-            terminal = self.terminals[self.active_terminal_id]
+        if 0 <= self.active_terminal_idx < len(self.terminals):
+            terminal = self.terminals[self.active_terminal_idx]
             terminal.render(terminal_x, y, self.terminal_width, height)
+            self.render_title(terminal.title)
 
     def update_selection(self, x, y):
         self.mouse_x = x
@@ -98,16 +90,9 @@ class App(core.Window):
             else:
                 selected_button = self.BUTTON_CAPTION
         else:
-            line_height = self.get_line_height(theme.Selector.FONT_SIZE)
-            button_height = int(line_height + theme.Selector.BUTTON_PAD_HEIGHT * 2)
-            sizebar_width = theme.Selector.SIZEBAR_WIDTH
-
-            if x < self.selector_width - sizebar_width:
+            if x < self.selector_width:
                 selected_group = self.GROUP_SELECTOR
-                selected_button = (y - caption_size) // button_height
-            elif x < self.selector_width + sizebar_width:
-                selected_group = self.GROUP_CONTROLS
-                selected_button = self.BUTTON_SIZEBAR
+                selected_button = (y - caption_size) // theme.Selector.WIDTH
             else:
                 selected_group = self.GROUP_TERMINAL
         
@@ -118,22 +103,13 @@ class App(core.Window):
             self.redraw()
     
     def update_cursor(self):
-        if self.is_resizing_selector:
-            self.set_cursor(core.cursors.SIZEWE)
-        elif self.selected_group == self.GROUP_CONTROLS and self.selected_button == self.BUTTON_SIZEBAR:
-            self.set_cursor(core.cursors.SIZEWE)
-        elif self.selected_group == self.GROUP_TERMINAL:
+        if self.selected_group == self.GROUP_TERMINAL:
             self.set_cursor(core.cursors.IBEAM)
         else:
             self.set_cursor(core.cursors.ARROW)
     
     def on_mousemove(self, x, y):
         self.update_selection(x, y)
-        if self.is_resizing_selector:
-            border_size = theme.Window.BORDER_SIZE
-            width = self.get_width() - border_size * 2
-            self.terminal_selector_size = max(theme.Selector.MIN_WIDTH, (x - border_size) / width)
-            self.redraw()
     
     def on_mousedown(self, button, x, y):
         self.update_selection(x, y)
@@ -141,14 +117,10 @@ class App(core.Window):
             if self.selected_group == self.GROUP_CONTROLS:
                 if self.selected_button == self.BUTTON_CAPTION:
                     self.drag()
-                elif self.selected_button == self.BUTTON_SIZEBAR:
-                    self.is_resizing_selector = True
     
     def on_mouseup(self, button, x, y):
         self.update_selection(x, y)
-        if self.is_resizing_selector:
-            self.is_resizing_selector = False
-        
+
         if self.selected_group == self.GROUP_CONTROLS:
             if button != core.buttons.LEFT:
                 return
@@ -165,8 +137,8 @@ class App(core.Window):
         elif self.selected_group == self.GROUP_SELECTOR:
             if button == core.buttons.LEFT:
                 if self.selected_button >= 0 and self.selected_button < len(self.terminals):
-                    if self.active_terminal_id != self.selected_button:
-                        self.active_terminal_id = self.selected_button
+                    if self.active_terminal_idx != self.selected_button:
+                        self.active_terminal_idx = self.selected_button
                         self.redraw()
                 elif self.selected_button == len(self.terminals):
                     self.create_terminal()
@@ -175,6 +147,10 @@ class App(core.Window):
                 if self.selected_button >= 0 and self.selected_button < len(self.terminals):
                     self.destroy_terminal(self.selected_button)
                     self.redraw()
+        elif self.selected_group == self.GROUP_TERMINAL:
+            if 0 <= self.active_terminal_idx < len(self.terminals):
+                terminal = self.terminals[self.active_terminal_idx]
+                terminal.on_mouseup(button, x - self.selector_width, y - theme.Window.CAPTION_SIZE)
     
     def on_doubleclick(self, button, x, y):
         self.update_selection(x, y)
@@ -192,32 +168,25 @@ class App(core.Window):
         self.redraw()
     
     def on_scroll(self, delta, x, y):
-        if 0 <= self.active_terminal_id < len(self.terminals):
-            terminal = self.terminals[self.active_terminal_id]
+        if 0 <= self.active_terminal_idx < len(self.terminals):
+            terminal = self.terminals[self.active_terminal_idx]
             terminal.on_scroll(delta)
     
     def on_input(self, char):
-        if 0 <= self.active_terminal_id < len(self.terminals):
-            terminal = self.terminals[self.active_terminal_id]
+        if 0 <= self.active_terminal_idx < len(self.terminals):
+            terminal = self.terminals[self.active_terminal_idx]
             terminal.on_input(char)
     
     def on_keydown(self, key):
         if core.is_key_down(core.keys.LMENU):
             return
-        if 0 <= self.active_terminal_id < len(self.terminals):
-            terminal = self.terminals[self.active_terminal_id]
+        if 0 <= self.active_terminal_idx < len(self.terminals):
+            terminal = self.terminals[self.active_terminal_idx]
             terminal.on_keydown(key)
     
     def on_keyup(self, key):
-        if core.is_key_down(core.keys.LMENU):
-            if key == ord('Q'):
-                self.destroy()
-            elif key == ord('R'):
-                self.resize_active_terminal()
-            return
-        
-        if 0 <= self.active_terminal_id < len(self.terminals):
-            terminal = self.terminals[self.active_terminal_id]
+        if 0 <= self.active_terminal_idx < len(self.terminals):
+            terminal = self.terminals[self.active_terminal_idx]
             terminal.on_keyup(key)
     
     def render_terminal_selector(self, x, y, width, height):
@@ -225,29 +194,52 @@ class App(core.Window):
         
         line_height = self.get_line_height(theme.Selector.FONT_SIZE)
         advance = self.get_advance(theme.Selector.FONT_SIZE)
-        button_height = int(line_height + theme.Selector.BUTTON_PAD_HEIGHT * 2)
+        button_height = width
 
-        for i, terminal in enumerate(self.terminals):
-            is_active = (i == self.active_terminal_id)
+        for i in range(len(self.terminals)):
+            is_active = (i == self.active_terminal_idx)
             is_hovered = self.selected_group == self.GROUP_SELECTOR and (i == self.selected_button)
-            self.render_selector_button(terminal.title, line_height, advance, x, y + i * button_height, width, is_hovered, is_active)
+            self.render_selector_button(str(i), line_height, advance, x, y + i * button_height, width, is_hovered, is_active)
         
         new_button_idx = len(self.terminals)
         is_new_button_hovered = (self.selected_group == self.GROUP_SELECTOR and new_button_idx == self.selected_button)
         new_button_y = y + new_button_idx * button_height
-        self.render_selector_button("New", line_height, advance, x, new_button_y, width, is_new_button_hovered, False)
+        self.render_selector_button("+", line_height, advance, x, new_button_y, width, is_new_button_hovered, False)
 
     def render_selector_button(self, text, line_height, advance, x, y, width, is_hovered, is_active):
         color = theme.Selector.BUTTON_ACTIVE if is_active else theme.Selector.BUTTON_HOVER if is_hovered else theme.Selector.BUTTON
         
-        height = int(line_height + theme.Selector.BUTTON_PAD_HEIGHT * 2)
+        height = width
         self.rect(x, y, x + width, y + height, color, 1)
-
-        text_x = x + theme.Selector.BUTTON_PAD_WIDTH
-        text_y = y + theme.Selector.BUTTON_PAD_HEIGHT
-        text_max_length = int((width - theme.Selector.BUTTON_PAD_WIDTH * 2) // advance)
+        text_max_length = int(width // advance)
         text = text[:text_max_length]
+        text_width = int(advance * len(text))
+
+        text_x = x + (width - text_width) // 2
+        text_y = y + (height - line_height) // 2
+
         self.text(text, theme.Selector.FONT_SIZE, text_x, text_y, theme.Selector.TEXT, -1, -1, 1.0)
+    
+    def render_title(self, title):
+        outline_thickness = theme.Window.OUTLINE_THICKNESS
+        caption_size = theme.Window.CAPTION_SIZE + outline_thickness
+        button_area_width = theme.Window.BUTTON_SIZE * 3
+        caption_left = outline_thickness
+        caption_right = self.get_width() - button_area_width - outline_thickness
+        caption_width = caption_right - caption_left
+
+        max_title_length = int(caption_width // self.get_advance(theme.Window.TITLE_FONT_SIZE))
+        title = title[:max_title_length]
+
+        font_size = theme.Window.TITLE_FONT_SIZE
+        line_height = self.get_line_height(font_size)
+        advance = self.get_advance(font_size)
+        text_width = int(advance * len(title))
+
+        text_x = caption_left + (caption_width - text_width) // 2
+        text_y = (caption_size - line_height) // 2
+
+        self.text(title, font_size, text_x, text_y, theme.Window.TITLE_TEXT_COLOR, -1, -1, 1.0)
 
     def render_frame(self):
         self.clear(theme.Window.BG)

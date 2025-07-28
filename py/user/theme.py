@@ -2,11 +2,11 @@
 class Window:
     FONT="Cascadia Mono"
 
-    WIDTH=1000
+    WIDTH=900
     HEIGHT=600
 
     MIN_WIDTH=375
-    MIN_HEIGHT=225
+    MIN_HEIGHT=250
     CAPTION_SIZE=30
     BORDER_SIZE=5
 
@@ -21,10 +21,11 @@ class Window:
     BUTTON_ICON_SIZE = 6
     OUTLINE_THICKNESS = 1
 
+    TITLE_FONT_SIZE = 14
+    TITLE_TEXT_COLOR = 0xEEEEEE
+
 class Selector:
-    BASE_WIDTH = 0.2 # 20% of the window width
-    MIN_WIDTH = 0.01 # 1% of the window width
-    SIZEBAR_WIDTH = 5
+    WIDTH = 45
 
     BG = 0x242424
     TEXT = 0xEEEEEE
@@ -32,18 +33,13 @@ class Selector:
     BUTTON_HOVER = 0x444444
     BUTTON_ACTIVE = 0x555555
     FONT_SIZE = 14
-    BUTTON_PAD_WIDTH = 10
-    BUTTON_PAD_HEIGHT = 10
 
 class Terminal:
     BASE_FONT_SIZE=14
     NUM_ROWS=35
     NUM_COLUMNS=90
-    KEEP_NEGATIVE_LINES=5
-    LINE_NUMBERS = True
     CURSOR_WIDTH = 1
     SCROLL_SPEED = 0.06
-    RESERVED_WIDTH = 0.1
 
     BG = 0x2d2d2d
     TEXT = 0x96DED1

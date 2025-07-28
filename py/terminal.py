@@ -1,6 +1,6 @@
 import core
 from core import PseudoConsole, ColoredTextBuffer
-import theme
+import user.theme as theme
 import weakref
 import math
 
@@ -34,6 +34,8 @@ class Terminal:
         self.current_screen = self.main_screen
         self.is_alt_screen = False
 
+        self.is_cursor_visible = True
+
         # Terminal dimensions
         self.font_size = theme.Terminal.BASE_FONT_SIZE
         self.num_rows = theme.Terminal.NUM_ROWS
@@ -41,7 +43,6 @@ class Terminal:
 
         # Scrolling state
         self.scroll_offset = 0
-        self.line_count = 0
 
         # ANSI state
         self.foreground_color = theme.Terminal.TEXT
@@ -79,12 +80,22 @@ class Terminal:
         return callback
 
     def resize(self, width, height):
-        width *= (1 - theme.Terminal.RESERVED_WIDTH)
-        line_height = self.app.get_line_height(self.font_size)
+        line_height = math.ceil(self.app.get_line_height(self.font_size))
         advance = self.app.get_advance(self.font_size)
-        self.num_rows = int(height // line_height)
-        self.num_columns = int(width // advance)
-        self.console.resize(self.num_rows, self.num_columns)
+        num_rows = int(height // line_height)
+        num_columns = int(width // advance)
+        if num_rows != self.num_rows or num_columns != self.num_columns:
+            self.num_rows = num_rows
+            self.num_columns = num_columns
+            self.scroll_offset = max(
+                0, min(self.main_screen.start_pos, self.scroll_offset)
+            )
+            self.console.resize(self.num_rows, self.num_columns)
+            self.current_screen.buffer.resize_lines(
+                self.current_screen.start_pos,
+                self.current_screen.start_pos + self.num_rows - 1,
+                self.num_columns,
+            )
 
     def on_console_output(self, output):
         self.process_ansi(output)
@@ -122,12 +133,20 @@ class Terminal:
                 self.font_size = font_size
                 self.app.redraw()
         elif not self.is_alt_screen:  # Scrolling only works in main screen
-            visible_rows = self.app.get_client_height() / self.app.get_line_height(self.font_size)
+            visible_rows = self.app.get_client_height() / self.app.get_line_height(
+                self.font_size
+            )
             delta *= math.floor(theme.Terminal.SCROLL_SPEED * visible_rows)
-            new_offset = min(self.line_count, self.scroll_offset + delta)
+            new_offset = max(
+                0, min(self.main_screen.start_pos, self.scroll_offset + delta)
+            )
             if new_offset != self.scroll_offset:
                 self.scroll_offset = new_offset
                 self.app.redraw()
+
+    def on_mouseup(self, button, x, y):
+        if button == core.buttons.RIGHT:
+            self.console.send(core.clipboard_paste())
 
     def render(self, x, y, width, height):
         """Render the terminal"""
@@ -139,37 +158,14 @@ class Terminal:
             self.app.text_buffer(
                 self.alt_screen.buffer, x, y, width, height, 0, 0, self.font_size
             )
-            cursor_x = math.floor(x + self.alt_screen.cursor_x * advance)
-            cursor_y = y + self.alt_screen.cursor_y * line_height
-            self.render_cursor(cursor_x, cursor_y)
+            if self.is_cursor_visible:
+                cursor_x = math.floor(x + self.alt_screen.cursor_x * advance)
+                cursor_y = y + self.alt_screen.cursor_y * line_height
+                self.render_cursor(cursor_x, cursor_y)
         else:
             # Calculate buffer view based on scroll offset
             buffer_x = 0
-            buffer_y = max(0, self.line_count - self.scroll_offset)
-
-            # Render line numbers if enabled
-            if theme.Terminal.LINE_NUMBERS:
-                start_line = buffer_y + 1
-                end_line = buffer_y + height // line_height
-                max_len = math.floor(math.log10(max(1, end_line)) + 1)
-                line_y = y
-
-                for i in range(start_line, end_line + 1):
-                    line_number = str(i)
-                    self.app.text(
-                        line_number,
-                        self.font_size,
-                        x,
-                        line_y,
-                        theme.Terminal.LINE_NUMBER,
-                        -1,
-                        -1,
-                        1,
-                    )
-                    line_y += line_height
-
-                # Adjust text buffer position for line numbers
-                x += advance * (max_len + 1)
+            buffer_y = max(0, self.main_screen.start_pos - self.scroll_offset)
 
             # Render the main buffer
             self.app.text_buffer(
@@ -182,13 +178,16 @@ class Terminal:
                 buffer_y,
                 self.font_size,
             )
-            local_cursor_y = (
-                self.main_screen.cursor_y + self.main_screen.start_pos - buffer_y
-            )
-            if 0 <= local_cursor_y < self.num_rows:
-                cursor_x = math.floor(x + self.main_screen.cursor_x * advance)
-                cursor_y = y + local_cursor_y * line_height
-                self.render_cursor(cursor_x, cursor_y)
+            if self.is_cursor_visible:
+                local_cursor_y = (
+                    self.main_screen.cursor_y + self.main_screen.start_pos - buffer_y
+                )
+                if 0 <= local_cursor_y < self.num_rows:
+                    cursor_x = math.floor(x + self.main_screen.cursor_x * advance)
+                    cursor_y = y + local_cursor_y * line_height
+                    self.render_cursor(cursor_x, cursor_y)
+
+        self.resize(width, height)
 
     def render_cursor(self, x, y):
         """Render the cursor at the given position"""
@@ -211,6 +210,7 @@ class Terminal:
 
     def process_ansi(self, text):
         """Process text with ANSI escape sequences"""
+        print(text.replace("\x1b", "ESC").replace(" ", "_"))
         text_buffer = ""
 
         for c in text:
@@ -296,19 +296,19 @@ class Terminal:
             current_lines = screen.buffer.get_line_count()
             while current_lines <= line_index:
                 screen.buffer.add_line()
+                screen.buffer.resize_lines(
+                    current_lines, current_lines, self.num_columns
+                )
                 current_lines += 1
 
         else:
-            current_lines = self.line_count - screen.start_pos
+            current_lines = screen.buffer.get_line_count() - screen.start_pos
             while current_lines <= line_index:
                 screen.buffer.add_line()
+                screen.buffer.resize_lines(
+                    current_lines, current_lines, self.num_columns
+                )
                 current_lines += 1
-                self.line_count += 1
-                if (
-                    self.scroll_offset - self.num_rows
-                    < -theme.Terminal.KEEP_NEGATIVE_LINES
-                ):
-                    self.scroll_offset += 1
 
     def handle_new_line(self):
         """Process a newline character"""
@@ -447,7 +447,7 @@ class Terminal:
                     line_length - 1,
                     -1,
                     -1,
-                    -1,
+                    self.background_color,
                 )
         elif mode == 1:  # Clear from start to cursor
             if screen.cursor_x > 0:
@@ -458,7 +458,7 @@ class Terminal:
                     min(screen.cursor_x, line_length - 1),
                     -1,
                     -1,
-                    -1,
+                    self.background_color,
                 )
         elif mode == 2:  # Clear entire line
             screen.buffer.set_color(
@@ -467,7 +467,7 @@ class Terminal:
                 line_length - 1,
                 -1,
                 -1,
-                -1,
+                self.background_color,
             )
 
     def clear_screen(self, mode=0):
@@ -492,7 +492,7 @@ class Terminal:
                     screen.buffer.get_line_length(line_index) - 1,
                     -1,
                     -1,
-                    -1,
+                    self.background_color,
                 )
                 line_index += 1
 
@@ -505,7 +505,7 @@ class Terminal:
                     screen.buffer.get_line_length(i) - 1,
                     -1,
                     -1,
-                    -1,
+                    self.background_color,
                 )
 
             # Clear current line from start to cursor
@@ -519,7 +519,7 @@ class Terminal:
                     screen.buffer.get_line_length(i) - 1,
                     -1,
                     -1,
-                    -1,
+                    self.background_color,
                 )
 
     def insert_lines(self, count=1):
@@ -549,7 +549,7 @@ class Terminal:
             screen.cursor_x + count - 1,
             -1,
             -1,
-            -1,
+            self.background_color,
         )
 
     def handle_escape_sequence(self, sequence):
@@ -559,15 +559,8 @@ class Terminal:
 
         if sequence[1] == "[":  # CSI sequence
             self.handle_csi_sequence(sequence[2:])
-        elif sequence[1] == "]":  # OSC sequence - ignored for now
-            # OSC (Operating System Command) sequence
-            # Example: ESC ] 0;title BEL or ESC ] 2;title BEL
-            # Only handle set window title (0 or 2)
-            parts = sequence[2:].split(";")
-            if parts and parts[0] in ("0", "2"):
-                # Title is everything after the first ';'
-                title = ";".join(parts[1:]).rstrip("\x07")
-                self.title = title
+        elif sequence[1] == "]":
+            self.handle_osc(sequence[2:])
         elif len(sequence) == 2:
             command = sequence[1]
             screen = self.current_screen
@@ -632,10 +625,22 @@ class Terminal:
             for param in params:
                 if param in (47, 1047, 1049):  # Switch to alt screen
                     self.switch_to_alt_screen()
+                if param == 25:  # Show cursor
+                    self.is_cursor_visible = True
         elif command == "l":  # Reset mode
             for param in params:
                 if param in (47, 1047, 1049):  # Switch to main screen
                     self.switch_to_main_screen()
+                if param == 25:  # Hide cursor
+                    self.is_cursor_visible = False
+    
+    def handle_osc(self, seq):
+        """Handle Operating System Command (OSC) sequences"""
+        parts = seq.split(";")
+        if parts and parts[0] in ("0", "2"): # Title sequence
+            # Title is everything after the first ';'
+            title = ";".join(parts[1:]).rstrip("\x07")
+            self.title = title
 
     def handle_csi(self, params, command):
         """Handle standard CSI sequences"""

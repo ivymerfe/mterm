@@ -149,6 +149,9 @@ PYBIND11_MODULE(mterm, m) {
       .def("remove_lines", &MTerm::ColoredTextBuffer::RemoveLines,
            "Remove lines in range", py::arg("start_index"),
            py::arg("end_index"))
+      .def("resize_lines", &MTerm::ColoredTextBuffer::ResizeLines,
+           "Resize lines in range", py::arg("start_index"),
+           py::arg("end_index"), py::arg("new_size"))
       .def(
           "write_to_line",
           [](MTerm::ColoredTextBuffer& self, size_t line_index,
@@ -185,6 +188,9 @@ PYBIND11_MODULE(mterm, m) {
           },
           "Set text at position", py::arg("line_index"), py::arg("offset"),
           py::arg("content"))
+      .def("set_spaces", &MTerm::ColoredTextBuffer::SetSpaces,
+           "Set spaces in line", py::arg("line_index"), py::arg("start_pos"),
+           py::arg("end_pos"))
       .def("set_color", &MTerm::ColoredTextBuffer::SetColor,
            "Set color for text range", py::arg("line_index"),
            py::arg("start_pos"), py::arg("end_pos"), py::arg("color"),
