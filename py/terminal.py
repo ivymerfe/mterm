@@ -210,7 +210,7 @@ class Terminal:
 
     def process_ansi(self, text):
         """Process text with ANSI escape sequences"""
-        print(text.replace("\x1b", "ESC").replace(" ", "_"))
+        #print(text.replace("\x1b", "ESC").replace(" ", "_"))
         text_buffer = ""
 
         for c in text:
