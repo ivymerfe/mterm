@@ -23,7 +23,7 @@ pybind11_add_module(mterm
     "ColoredTextBuffer.cpp"
 )
 
-target_link_libraries(mterm PRIVATE dxguid.lib d2d1.lib dwrite.lib shell32.lib)
+target_link_libraries(mterm PRIVATE dxguid.lib d2d1.lib dwrite.lib shell32.lib dwmapi.lib)
 
 set_property(TARGET mterm PROPERTY CXX_STANDARD 20)
 

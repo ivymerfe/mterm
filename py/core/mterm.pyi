@@ -46,7 +46,7 @@ class Config:
     mouseup_callback: Optional[MouseButtonCallback]
     doubleclick_callback: Optional[MouseButtonCallback]
     scroll_callback: Optional[ScrollCallback]
-    mouse_leave_callback: Optional[MouseLeaveCallback]
+    mouseleave_callback: Optional[MouseLeaveCallback]
 
     def __init__(self) -> None: ...
 

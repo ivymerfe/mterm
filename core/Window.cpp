@@ -9,6 +9,7 @@
 #include <dwrite.h>
 #include <shlobj.h>
 #include <wrl/client.h>
+#include <dwmapi.h>
 
 #include <algorithm>
 #include <condition_variable>
@@ -120,12 +121,9 @@ class Window::Impl {
       return 2;
     }
     SetCurrentProcessExplicitAppUserModelID(L"MTerm.Terminal.App.1.0");
-    if (hIcon) {
-      SendMessage(m_hWindow, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
-    }
-    if (hIconSm) {
-      SendMessage(m_hWindow, WM_SETICON, ICON_SMALL, (LPARAM)hIconSm);
-    }
+    MARGINS margins = {0,0,1,0};
+    DwmExtendFrameIntoClientArea(m_hWindow, &margins);
+
     ShowWindow(m_hWindow, SW_SHOWDEFAULT);
     std::thread init_thread([this]() { this->InitRenderer(); });
     init_thread.detach();
@@ -603,10 +601,11 @@ class Window::Impl {
         PostQuitMessage(0);
         return 0;
       case WM_NCCALCSIZE: {
-        if (wParam == TRUE) {
-          return 0;
-        }
-        break;
+        // if (wParam == TRUE) {
+        //   return 0;
+        // }
+        // break;
+        return 0;
       }
       case WM_GETICON: {
         // Возвращаем нашу иконку когда система запрашивает её
@@ -759,7 +758,7 @@ class Window::Impl {
           int y = GET_Y_LPARAM(lParam);
           window->m_config.mousemove_callback(x, y);
         }
-        if (window->m_config.mouse_leave_callback && !window->is_tracking) {
+        if (window->m_config.mouseleave_callback && !window->is_tracking) {
           TRACKMOUSEEVENT tme = {};
           tme.cbSize = sizeof(TRACKMOUSEEVENT);
           tme.dwFlags = TME_LEAVE;
@@ -857,8 +856,8 @@ class Window::Impl {
       }
       case WM_MOUSELEAVE: {
         window->is_tracking = false;
-        if (window && window->m_config.mouse_leave_callback) {
-          window->m_config.mouse_leave_callback();
+        if (window && window->m_config.mouseleave_callback) {
+          window->m_config.mouseleave_callback();
         }
         return 0;
       }

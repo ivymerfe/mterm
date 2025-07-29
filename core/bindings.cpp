@@ -86,8 +86,8 @@ PYBIND11_MODULE(mterm, m) {
       .def_readwrite("doubleclick_callback",
                      &MTerm::Config::doubleclick_callback)
       .def_readwrite("scroll_callback", &MTerm::Config::scroll_callback)
-      .def_readwrite("mouse_leave_callback",
-                     &MTerm::Config::mouse_leave_callback);
+      .def_readwrite("mouseleave_callback",
+                     &MTerm::Config::mouseleave_callback);
 
   // Экспорт PseudoConsole с UTF-8 callback
   py::class_<MTerm::PseudoConsole>(m, "PseudoConsole")
@@ -282,11 +282,11 @@ PYBIND11_MODULE(mterm, m) {
               };
             }
 
-            if (config.mouse_leave_callback) {
-              auto original_mouse_leave = config.mouse_leave_callback;
-              config.mouse_leave_callback = [original_mouse_leave]() {
+            if (config.mouseleave_callback) {
+              auto original_mouseleave = config.mouseleave_callback;
+              config.mouseleave_callback = [original_mouseleave]() {
                 py::gil_scoped_acquire acquire;
-                original_mouse_leave();
+                original_mouseleave();
               };
             }
 

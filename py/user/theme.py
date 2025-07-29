@@ -11,7 +11,6 @@ class Window:
     BORDER_SIZE=5
 
     BG = 0x1e1e1e
-    OUTLINE = 0x404040
     CLOSE_BUTTON = 0xFF1060
     MAX_BUTTON = 0x00FFFF
     MIN_BUTTON = 0x00ff00
@@ -19,7 +18,6 @@ class Window:
 
     BUTTON_SIZE = 40
     BUTTON_ICON_SIZE = 6
-    OUTLINE_THICKNESS = 1
 
     TITLE_FONT_SIZE = 14
     TITLE_TEXT_COLOR = 0xEEEEEE
@@ -28,7 +26,7 @@ class Selector:
     WIDTH = 45
 
     BG = 0x242424
-    TEXT = 0xEEEEEE
+    TEXT = 0xFCFCFC
     BUTTON = 0x333333
     BUTTON_HOVER = 0x444444
     BUTTON_ACTIVE = 0x555555

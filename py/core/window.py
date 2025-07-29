@@ -32,7 +32,7 @@ class Window(mterm.Window):
     def on_scroll(self, delta, x, y):
         pass
 
-    def on_mouse_leave(self):
+    def on_mouseleave(self):
         pass
 
     def run(
@@ -64,6 +64,6 @@ class Window(mterm.Window):
         config.mouseup_callback = self.on_mouseup
         config.doubleclick_callback = self.on_doubleclick
         config.scroll_callback = self.on_scroll
-        config.mouse_leave_callback = self.on_mouse_leave
+        config.mouseleave_callback = self.on_mouseleave
 
         return self.create(config)

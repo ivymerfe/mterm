@@ -1,8 +1,8 @@
-import core
 from core import PseudoConsole, ColoredTextBuffer
 import user.theme as theme
 import weakref
 import math
+from user.highlight import highlight
 
 
 class Screen:
@@ -22,10 +22,11 @@ class EscapeState:
     OSC = 3
 
 
-class Terminal:
-    def __init__(self, app, title):
+class BaseTerminal:
+    def __init__(self, app, id):
         self.app = app
-        self.title = title
+        self.id = id
+        self.title = f"T-{self.id}"
         self.console = PseudoConsole()
 
         # Screen management
@@ -66,7 +67,7 @@ class Terminal:
         self.console.start(
             self.num_rows,
             self.num_columns,
-            self._make_callback(Terminal.on_console_output),
+            self._make_callback(BaseTerminal.on_console_output),
         )
 
     def _make_callback(self, method):
@@ -100,53 +101,6 @@ class Terminal:
     def on_console_output(self, output):
         self.process_ansi(output)
         self.app.redraw()
-
-    def on_input(self, input_text):
-        self.console.send(input_text)
-
-    def on_keydown(self, key):
-        if key == core.keys.LEFT:
-            self.console.send("\x1b[D")  # Move cursor left
-        elif key == core.keys.RIGHT:
-            self.console.send("\x1b[C")
-        elif key == core.keys.UP:
-            self.console.send("\x1b[A")
-        elif key == core.keys.DOWN:
-            self.console.send("\x1b[B")
-        elif key == core.keys.HOME:
-            self.console.send("\x1b[H")
-        elif key == core.keys.END:
-            self.console.send("\x1b[F")
-        elif key == core.keys.UP:
-            self.console.send("\x1b[1;5A")
-        elif key == core.keys.DOWN:
-            self.console.send("\x1b[1;5B")
-
-    def on_keyup(self, key):
-        pass
-
-    def on_scroll(self, delta):
-        if core.is_key_down(core.keys.LCONTROL):
-            # Zoom in/out with Ctrl+scroll
-            font_size = max(4, self.font_size + delta)
-            if font_size != self.font_size:
-                self.font_size = font_size
-                self.app.redraw()
-        elif not self.is_alt_screen:  # Scrolling only works in main screen
-            visible_rows = self.app.get_client_height() / self.app.get_line_height(
-                self.font_size
-            )
-            delta *= math.floor(theme.Terminal.SCROLL_SPEED * visible_rows)
-            new_offset = max(
-                0, min(self.main_screen.start_pos, self.scroll_offset + delta)
-            )
-            if new_offset != self.scroll_offset:
-                self.scroll_offset = new_offset
-                self.app.redraw()
-
-    def on_mouseup(self, button, x, y):
-        if button == core.buttons.RIGHT:
-            self.console.send(core.clipboard_paste())
 
     def render(self, x, y, width, height):
         """Render the terminal"""
@@ -210,7 +164,7 @@ class Terminal:
 
     def process_ansi(self, text):
         """Process text with ANSI escape sequences"""
-        #print(text.replace("\x1b", "ESC").replace(" ", "_"))
+        # print(text.replace("\x1b", "ESC").replace(" ", "_"))
         text_buffer = ""
 
         for c in text:
@@ -381,6 +335,7 @@ class Terminal:
         if not self.is_alt_screen:
             self.is_alt_screen = True
             self.current_screen = self.alt_screen
+            self.is_cursor_visible = True
 
             # Clear alternate screen
             line_count = self.alt_screen.buffer.get_line_count()
@@ -400,6 +355,7 @@ class Terminal:
         if self.is_alt_screen:
             self.is_alt_screen = False
             self.current_screen = self.main_screen
+            self.is_cursor_visible = True
 
     def insert_text(self, text):
         """Insert text at current cursor position with current attributes"""
@@ -414,14 +370,21 @@ class Terminal:
             screen.cursor_y + screen.start_pos, screen.cursor_x, text
         )
 
+        color = self.foreground_color
+        underline_color = self.underline_color if self.underline_enabled else -1
+        background_color = self.background_color
+        color, underline_color, background_color = highlight(
+            text, color, underline_color, background_color
+        )
+
         # Apply current attributes to the inserted text
         screen.buffer.set_color(
             screen.cursor_y + screen.start_pos,
             screen.cursor_x,
             screen.cursor_x + len(text) - 1,
-            self.foreground_color,
-            self.underline_color if self.underline_enabled else -1,
-            self.background_color,
+            color,
+            underline_color,
+            background_color,
         )
 
         # Advance cursor
@@ -633,11 +596,11 @@ class Terminal:
                     self.switch_to_main_screen()
                 if param == 25:  # Hide cursor
                     self.is_cursor_visible = False
-    
+
     def handle_osc(self, seq):
         """Handle Operating System Command (OSC) sequences"""
         parts = seq.split(";")
-        if parts and parts[0] in ("0", "2"): # Title sequence
+        if parts and parts[0] in ("0", "2"):  # Title sequence
             # Title is everything after the first ';'
             title = ";".join(parts[1:]).rstrip("\x07")
             self.title = title

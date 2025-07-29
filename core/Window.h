@@ -29,7 +29,7 @@ struct Config {
   std::function<void(int button, int x, int y)> mouseup_callback;
   std::function<void(int button, int x, int y)> doubleclick_callback;
   std::function<void(int delta, int x, int y)> scroll_callback;
-  std::function<void()> mouse_leave_callback;
+  std::function<void()> mouseleave_callback;
 };
 
 class Window {
