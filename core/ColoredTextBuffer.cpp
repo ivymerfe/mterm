@@ -40,7 +40,8 @@ void ColoredTextBuffer::RemoveLines(size_t start_index, size_t end_index) {
 void ColoredTextBuffer::ResizeLines(size_t start_index,
                                     size_t end_index,
                                     size_t new_size) {
-  if (start_index >= m_lines.size() || end_index < start_index || new_size == 0) {
+  if (start_index >= m_lines.size() || end_index < start_index ||
+      new_size == 0) {
     return;  // Invalid range or new size
   }
   end_index = std::min(end_index, m_lines.size() - 1);
@@ -115,7 +116,11 @@ std::string ColoredTextBuffer::GetLineText(size_t line_index,
   const auto& line = m_lines[line_index];
   int max_pos = static_cast<int>(line.text.size() - 1);
   start_pos = std::min(std::max(start_pos, 0), max_pos);
-  end_pos = std::min(std::max(end_pos, start_pos), max_pos);
+  if (end_pos == -1) {
+    end_pos = max_pos;
+  } else {
+    end_pos = std::min(std::max(end_pos, start_pos), max_pos);
+  }
   if (start_pos > end_pos) {
     return std::string();  // Invalid range
   }

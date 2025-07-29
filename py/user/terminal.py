@@ -1,15 +1,13 @@
 import core
-import base
 import math
+from .terminal_with_selection import TerminalWithSelection, SelectionType
 from . import theme
 
 
-class Terminal(base.BaseTerminal):
+class Terminal(TerminalWithSelection):
     def __init__(self, app, id):
         super().__init__(app, id)
-
-    def on_input(self, input_text):
-        self.console.send(input_text)
+        self.is_selecting = False
 
     def on_keydown(self, key):
         if key == core.keys.LEFT:
@@ -28,6 +26,15 @@ class Terminal(base.BaseTerminal):
             self.console.send("\x1b[1;5A")
         elif key == core.keys.DOWN:
             self.console.send("\x1b[1;5B")
+
+    def on_input(self, input_text):
+        handled = False
+        if self.selection_type != SelectionType.NONE:
+            if input_text == "c" or input_text == "C":
+                self.copy_selection(input_text == "C")
+                handled = True
+        if not handled:
+            self.console.send(input_text)
 
     def on_keyup(self, key):
         pass
@@ -50,19 +57,93 @@ class Terminal(base.BaseTerminal):
             if new_offset != self.scroll_offset:
                 self.scroll_offset = new_offset
                 self.app.redraw()
-    
+
     def on_mousemove(self, x, y):
-        pass
-    
+        if self.is_selecting:
+            buffer_pos = self.get_buffer_position(x, y)
+            if buffer_pos != self.selection_end:
+                self.selection_end = buffer_pos
+                self.app.redraw()
+
     def on_mousedown(self, button, x, y):
-        pass
+        if x <= self.app.get_selector_width() or y <= self.app.get_caption_height():
+            return
+        current_selection_type = (
+            SelectionType.LINES
+            if button == core.buttons.LEFT
+            else (
+                SelectionType.BLOCK
+                if button == core.buttons.MIDDLE
+                else SelectionType.NONE
+            )
+        )
+
+        if core.is_key_down(core.keys.LSHIFT):
+            # Extend selection with Shift+click
+            self.is_selecting = self.selection_type == current_selection_type
+            self.selection_type = current_selection_type
+            self.selection_end = self.get_buffer_position(x, y)
+            self.app.redraw()
+            return
+
+        self.is_selecting = True
+        self.selection_type = current_selection_type
+        self.selection_start = self.get_buffer_position(x, y)
+        self.selection_end = self.selection_start
+        self.app.redraw()
 
     def on_mouseup(self, button, x, y):
+        if button == core.buttons.LEFT and self.selection_type == SelectionType.LINES:
+            self.is_selecting = False
+        if button == core.buttons.MIDDLE and self.selection_type == SelectionType.BLOCK:
+            self.is_selecting = False
         if button == core.buttons.RIGHT:
-            self.console.send(core.clipboard_paste())
+            if self.selection_type != SelectionType.NONE:
+                if not self.is_selecting:
+                    self.selection_type = SelectionType.NONE
+                    self.app.redraw()
+            else:
+                self.console.send(core.clipboard_paste())
 
     def on_doubleclick(self, button, x, y):
-        pass
+        if button == core.buttons.LEFT:
+            row, col = self.get_buffer_position(x, y)
+            line = self.current_screen.buffer.get_line_text(row, 0, -1)
+            if line[col] == " ":
+                return
+            typ = line[col].isalnum()
+            start = col
+            end = col
+            while start > 0 and (line[start - 1].isalnum() == typ):
+                start -= 1
+            while end < len(line) - 1 and (line[end + 1].isalnum() == typ):
+                end += 1
+            self.selection_type = SelectionType.LINES
+            self.selection_start = (row, start)
+            self.selection_end = (row, end)
+            self.app.redraw()
 
     def on_mouseleave(self):
-        pass
+        self.is_selecting = False
+
+    def switch_to_alt_screen(self):
+        super().switch_to_alt_screen()
+        self.selection_type = SelectionType.NONE
+
+    def switch_to_main_screen(self):
+        super().switch_to_main_screen()
+        self.selection_type = SelectionType.NONE
+
+    def copy_selection(self, append=False):
+        if self.selection_type != SelectionType.NONE:
+            text = self.get_selection_text()
+            if append:
+                prev_text = core.clipboard_paste()
+                if prev_text:
+                    core.clipboard_copy(prev_text + "\n" + text)
+                else:
+                    core.clipboard_copy(text)
+            else:
+                core.clipboard_copy(text)
+            self.selection_type = SelectionType.NONE
+            self.app.redraw()

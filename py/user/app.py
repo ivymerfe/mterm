@@ -17,7 +17,7 @@ class App(base.BaseApp):
     def update_selection(self, x, y):
         updated = super().update_selection(x, y)
         hovered_button = -1
-        if y > theme.Window.CAPTION_SIZE:
+        if y > self.get_caption_height():
             if x <= self.get_selector_width():
                 self.set_cursor(core.cursors.ARROW)
                 button_idx = (y - theme.Window.CAPTION_SIZE) // theme.Selector.WIDTH

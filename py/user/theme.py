@@ -43,6 +43,8 @@ class Terminal:
     TEXT = 0x96DED1
     CURSOR = 0xFFFF00
     LINE_NUMBER = 0xbbbbbb
+    SELECTION = 0x00FFFF
+    SELECTION_OPACITY = 0.2
 
     ANSI_COLORS = [
         0x1E1E1E,  # чёрный

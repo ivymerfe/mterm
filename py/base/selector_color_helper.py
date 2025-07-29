@@ -42,7 +42,7 @@ def get_normal_color(index):
     # Spread hues evenly in [0, 1]
     h = (index * 0.15) % 1.0
     s = 0.5
-    v = 0.5
+    v = 0.4
     return hsv_to_rgb_hex(h, s, v)
 
 def get_hovered_color(index):
