@@ -1,6 +1,6 @@
 import core
 import math
-from .terminal_with_selection import TerminalWithSelection, SelectionType
+from base import TerminalWithSelection, SelectionType
 from . import theme
 
 
@@ -28,13 +28,11 @@ class Terminal(TerminalWithSelection):
             self.console.send("\x1b[1;5B")
 
     def on_input(self, input_text):
-        handled = False
         if self.selection_type != SelectionType.NONE:
-            if input_text == "c" or input_text == "C":
-                self.copy_selection(input_text == "C")
-                handled = True
-        if not handled:
-            self.console.send(input_text)
+            if core.is_key_down(ord('C')):
+                self.copy_selection(append=core.is_key_down(core.keys.LSHIFT))
+                return
+        self.console.send(input_text)
 
     def on_keyup(self, key):
         pass

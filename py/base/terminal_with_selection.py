@@ -1,6 +1,6 @@
 import base
 import math
-from . import theme
+from user import theme
 
 
 class SelectionType:
