@@ -6,10 +6,10 @@
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
 #include <d2d1.h>
+#include <dwmapi.h>
 #include <dwrite.h>
 #include <shlobj.h>
 #include <wrl/client.h>
-#include <dwmapi.h>
 
 #include <algorithm>
 #include <condition_variable>
@@ -78,11 +78,14 @@ class Window::Impl {
     windowClass.hCursor = m_hCursor;
     windowClass.hbrBackground = 0;
 
-    HICON hIcon = (HICON)LoadImage(NULL, L"icon.ico", IMAGE_ICON, 128, 128,
-                                   LR_LOADFROMFILE);
-    HICON hIconSm = (HICON)LoadImage(NULL, L"icon.ico", IMAGE_ICON, 64, 64,
-                                     LR_LOADFROMFILE);
-
+    HICON hIcon = nullptr;
+    HICON hIconSm = nullptr;
+    if (!config.icon_path.empty()) {
+      hIcon = (HICON)LoadImage(NULL, config.icon_path.c_str(), IMAGE_ICON, 128,
+                               128, LR_LOADFROMFILE);
+      hIconSm = (HICON)LoadImage(NULL, config.icon_path.c_str(), IMAGE_ICON, 64,
+                                 64, LR_LOADFROMFILE);
+    }
     windowClass.hIcon = hIcon;
     windowClass.hIconSm = hIconSm;
 
@@ -121,7 +124,7 @@ class Window::Impl {
       return 2;
     }
     SetCurrentProcessExplicitAppUserModelID(L"MTerm.Terminal.App.1.0");
-    MARGINS margins = {0,0,1,0};
+    MARGINS margins = {0, 0, 1, 0};
     DwmExtendFrameIntoClientArea(m_hWindow, &margins);
 
     ShowWindow(m_hWindow, SW_SHOWDEFAULT);

@@ -38,6 +38,7 @@ class Window(mterm.Window):
     def run(
         self,
         font_name="Cascadia Mono",
+        icon_path="icon.ico",
         width=1000,
         height=600,
         min_width=375,
@@ -47,6 +48,7 @@ class Window(mterm.Window):
     ):
         config = mterm.Config()
         config.font_name = font_name
+        config.icon_path = icon_path
         config.window_width = width
         config.window_height = height
         config.window_min_width = min_width

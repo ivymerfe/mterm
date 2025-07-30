@@ -29,6 +29,7 @@ class ColoredLine:
 
 class Config:
     font_name: Optional[str]
+    icon_path: Optional[str]
     window_width: int
     window_height: int
     window_min_width: int

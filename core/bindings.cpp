@@ -51,6 +51,14 @@ PYBIND11_MODULE(mterm, m) {
           [](MTerm::Config& self, const std::string& utf8_str) {
             self.font_name = MTerm::Utils::Utf8ToWChar(utf8_str);
           })
+      .def_property(
+          "icon_path",
+          [](const MTerm::Config& self) -> std::string {
+            return MTerm::Utils::WCharToUtf8(self.icon_path);
+          },
+          [](MTerm::Config& self, const std::string& utf8_str) {
+            self.icon_path = MTerm::Utils::Utf8ToWChar(utf8_str);
+          })
       .def_readwrite("window_width", &MTerm::Config::window_width)
       .def_readwrite("window_height", &MTerm::Config::window_height)
       .def_readwrite("window_min_width", &MTerm::Config::window_min_width)

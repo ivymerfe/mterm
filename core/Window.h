@@ -12,6 +12,7 @@ constexpr auto TEXT_BUFFER_SIZE = 1024 * 1024;
 
 struct Config {
   std::wstring font_name;
+  std::wstring icon_path;
   int window_width;
   int window_height;
   int window_min_width;

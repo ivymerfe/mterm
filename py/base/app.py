@@ -174,7 +174,7 @@ class BaseApp(core.Window):
 
         height = width
         self.rect(x, y, x + width, y + height, color, 1)
-        
+
         text_max_length = int(width // advance)
         text = text[:text_max_length]
         text_width = int(advance * len(text))
@@ -292,10 +292,11 @@ class BaseApp(core.Window):
             1,
         )
 
-    def main(self):
+    def main(self, icon_path="icon.ico"):
         self.create_terminal()
         self.run(
             font_name=theme.Window.FONT,
+            icon_path=icon_path,
             width=theme.Window.WIDTH,
             height=theme.Window.HEIGHT,
             min_width=theme.Window.MIN_WIDTH,
