@@ -66,6 +66,10 @@ class Terminal(TerminalWithSelection):
     def on_mousedown(self, button, x, y):
         if x <= self.app.get_selector_width() or y <= self.app.get_caption_height():
             return
+        if button == core.buttons.RIGHT and self.selection_type == SelectionType.NONE:
+            self.console.send(core.clipboard_paste())
+            return
+        
         current_selection_type = (
             SelectionType.LINES
             if button == core.buttons.LEFT
@@ -84,7 +88,7 @@ class Terminal(TerminalWithSelection):
             self.app.redraw()
             return
 
-        self.is_selecting = True
+        self.is_selecting = current_selection_type != SelectionType.NONE
         self.selection_type = current_selection_type
         self.selection_start = self.get_buffer_position(x, y)
         self.selection_end = self.selection_start
@@ -95,15 +99,11 @@ class Terminal(TerminalWithSelection):
             self.is_selecting = False
         if button == core.buttons.MIDDLE and self.selection_type == SelectionType.BLOCK:
             self.is_selecting = False
-        if button == core.buttons.RIGHT:
-            if self.selection_type != SelectionType.NONE:
-                if not self.is_selecting:
-                    self.selection_type = SelectionType.NONE
-                    self.app.redraw()
-            else:
-                self.console.send(core.clipboard_paste())
 
     def on_doubleclick(self, button, x, y):
+        if button == core.buttons.RIGHT and self.selection_type == SelectionType.NONE:
+            self.console.send(core.clipboard_paste())
+            return
         if button == core.buttons.LEFT:
             row, col = self.get_buffer_position(x, y)
             line = self.current_screen.buffer.get_line_text(row, 0, -1)
