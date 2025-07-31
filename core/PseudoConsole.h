@@ -4,7 +4,7 @@
 #include <memory>
 
 namespace MTerm {
-constexpr auto PTY_BUFFER_SIZE = 16384;
+constexpr auto PTY_BUFFER_SIZE = 65536;
 
 class PseudoConsole {
  public:

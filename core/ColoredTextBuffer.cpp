@@ -114,6 +114,9 @@ std::string ColoredTextBuffer::GetLineText(size_t line_index,
     return std::string();  // Invalid line index
   }
   const auto& line = m_lines[line_index];
+  if (line.text.size() == 0) {
+    return std::string();
+  }
   int max_pos = static_cast<int>(line.text.size() - 1);
   start_pos = std::min(std::max(start_pos, 0), max_pos);
   if (end_pos == -1) {
