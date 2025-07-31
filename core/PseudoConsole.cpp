@@ -86,7 +86,7 @@ class PseudoConsole::Impl {
     std::wstring cmd = L"pwsh.exe -NoLogo";
     ok = CreateProcessW(
         nullptr, &cmd[0], nullptr, nullptr, FALSE,
-        EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT, nullptr,
+        EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_NEW_PROCESS_GROUP, nullptr,
         nullptr, &si.StartupInfo, &m_processInfo);
     assert(ok);
 
@@ -130,11 +130,13 @@ class PseudoConsole::Impl {
       CloseHandle(m_hInput);
     if (m_hOutput != INVALID_HANDLE_VALUE)
       CloseHandle(m_hOutput);
-    if (m_hPseudoConsole)
-      ClosePseudoConsole(m_hPseudoConsole);
     if (m_processInfo.hProcess) {
       TerminateProcess(m_processInfo.hProcess, 0);
+      WaitForSingleObject(m_processInfo.hProcess, INFINITE);
       CloseHandle(m_processInfo.hProcess);
+    }
+    if (m_hPseudoConsole) {
+      ClosePseudoConsole(m_hPseudoConsole);
     }
     if (m_processInfo.hThread)
       CloseHandle(m_processInfo.hThread);
