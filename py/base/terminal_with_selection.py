@@ -90,6 +90,8 @@ class TerminalWithSelection(base.BaseTerminal):
         end_row, end_col = self.selection_end
         start_row -= buffer_y
         end_row -= buffer_y
+        if start_row < 0 and end_row < 0:
+            return
         if start_row > end_row or (start_row == end_row and start_col > end_col):
             start_row, start_col, end_row, end_col = (
                 end_row,
@@ -99,13 +101,13 @@ class TerminalWithSelection(base.BaseTerminal):
             )
 
         start_x = x + start_col * advance
-        start_y = y + start_row * line_height
+        start_y = y + max(0, start_row) * line_height
         end_x = x + (end_col + 1) * advance
-        end_y = y + end_row * line_height
+        end_y = y + max(0, end_row) * line_height
         opacity = theme.Terminal.SELECTION_OPACITY
 
         if self.selection_type == SelectionType.LINES:
-            if start_y == end_y:
+            if start_row == end_row:
                 self.app.rect(
                     start_x,
                     start_y,
@@ -115,19 +117,20 @@ class TerminalWithSelection(base.BaseTerminal):
                     opacity,
                 )
             else:
-                self.app.rect(
-                    start_x,
-                    start_y,
-                    x + width,
-                    start_y + line_height,
-                    theme.Terminal.SELECTION,
-                    opacity,
-                )
+                if start_row >= 0:
+                    self.app.rect(
+                        start_x,
+                        start_y,
+                        x + width,
+                        start_y + line_height,
+                        theme.Terminal.SELECTION,
+                        opacity,
+                    )
                 inner_rows = end_row - start_row - 1
                 if inner_rows > 0:
                     self.app.rect(
                         x,
-                        start_y + line_height,
+                        start_y + line_height if start_row >= 0 else start_y,
                         x + width,
                         end_y,
                         theme.Terminal.SELECTION,

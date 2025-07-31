@@ -101,12 +101,16 @@ class Terminal(TerminalWithSelection):
             self.is_selecting = False
 
     def on_doubleclick(self, button, x, y):
+        if x <= self.app.get_selector_width() or y <= self.app.get_caption_height():
+            return
         if button == core.buttons.RIGHT and self.selection_type == SelectionType.NONE:
             self.console.send(core.clipboard_paste())
             return
         if button == core.buttons.LEFT:
             row, col = self.get_buffer_position(x, y)
             line = self.current_screen.buffer.get_line_text(row, 0, -1)
+            if col >= len(line):
+                return
             if line[col] == " ":
                 return
             typ = line[col].isalnum()
