@@ -12,7 +12,7 @@ class SelectionType:
 class TerminalWithSelection(base.BaseTerminal):
     def __init__(self, app, id):
         super().__init__(app, id)
-        self.selection_type = SelectionType.LINES
+        self.selection_type = SelectionType.NONE
         self.selection_start = None
         self.selection_end = None
 
